@@ -12,7 +12,7 @@ args = parser.parse_args()
 
 beds = args.beds_dir
 outdir = args.out_dir
-segcopy = pd.DataFrame(columns=["CHROM", "START", "END"])
+segcopy = pd.DataFrame(columns=["CHR", "START", "END"])
 for filename in os.listdir(beds):
     if filename.endswith(".bed"):
          # print(os.path.join(directory, filename))
@@ -22,7 +22,7 @@ for filename in os.listdir(beds):
         df = pd.read_csv(bed, sep="\t", header=None)
 
         if len(segcopy) == 0: #first cell
-            segcopy["CHROM"] = df[0]
+            segcopy["CHR"] = df[0]
             segcopy["START"] = df[1]
             segcopy["END"] = df[2]
         

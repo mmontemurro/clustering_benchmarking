@@ -1,7 +1,12 @@
 #!/usr/bin/envs python
 import re
 import sys
+import json
 import argparse
+from Bio import Phylo
+from gen_tree import gen_tree 
+from io import StringIO
+import matplotlib.pyplot as plt
 from pprint import pprint
 
 def from_dot_to_dict(dotfile):
@@ -85,8 +90,6 @@ def from_json_to_newick(node_to_children, root_node) -> str:
 
     return newick_string
 
-def from_nodes_to_json(tree):
-    return json
 
 def main():
     parser = argparse.ArgumentParser(description="Weighted dot to json converter.")
@@ -100,9 +103,20 @@ def main():
     outdir = args.outdir
 
     tree, root_node = from_dot_to_dict(dotfile)
+    with open(outdir+'/tree.json', 'w') as f:
+        json.dump(tree, f)
     #pprint(tree)
     #print("root node: {}".format(root_node))
     newick = from_json_to_newick(tree, root_node=root_node)
+    
+    # draw newick tree
+    handle = StringIO(newick)
+    tree = Phylo.read(handle, "newick")
+    tree.ladderize()
+    Phylo.draw(tree)
+    plt.gcf().set_size_inches(21, 40)
+    plt.savefig(outdir+"/tree.newick.png")
+    plt.clf()
 
     with open(outdir+"/tree.newick", 'w+') as f:
         f.write(newick)

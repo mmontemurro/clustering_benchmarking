@@ -12,9 +12,9 @@ import matplotlib.colors as colors
 
 def heatmap(cnvs, boundaries, method, metric, outdir):
     divnorm = colors.DivergingNorm(vmin=0, vcenter=2, vmax=12)  
-    chr_limits = boundaries.index[boundaries['END'].isin(boundaries.groupby('CHROM', sort=False)['END'].max().values)].tolist()
+    chr_limits = boundaries.index[boundaries['END'].isin(boundaries.groupby('CHR', sort=False)['END'].max().values)].tolist()
     chr_boundaries = np.append(0, chr_limits)
-    chr_list = boundaries['CHROM'].unique().tolist()
+    chr_list = boundaries['CHR'].unique().tolist()
     chrN_list = []
     for x in chr_list:
         x = x[3:] #remove 'chr' for readability
@@ -61,8 +61,8 @@ def main():
 
     df = pd.read_csv(segcopy, sep="\t")
 
-    cnvs = df.drop(['CHROM', 'START', 'END'], axis=1).transpose()
-    boundaries = df[['CHROM', 'START', 'END']].copy()
+    cnvs = df.drop(['CHR', 'START', 'END'], axis=1).transpose()
+    boundaries = df[['CHR', 'START', 'END']].copy()
 
     heatmap(cnvs, boundaries, 'complete', 'cityblock', outdir)
 
