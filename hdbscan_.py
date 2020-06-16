@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import time
+import umap
 import pandas as pd
 import seaborn as sns
 import numpy as np
@@ -21,7 +22,7 @@ def cluster_size(matrix):
     min_cluster_size=min(model_dict.items(), key=operator.itemgetter(1))[0]
     return min_cluster_size
 
-def cluster_and_output(min_cluster_size, matrix, outprefix):
+def cluster_and_output(min_cluster_size, matrix, outprefix, preproc):
     start_time = time.time()
     #cluster_selection_method='eom', cluster_selection_epsilon=0.5, metric='l1'
     model = hdbscan.HDBSCAN(min_cluster_size=min_cluster_size, min_samples=1, cluster_selection_epsilon=0.5).fit(matrix.values)
@@ -34,7 +35,11 @@ def cluster_and_output(min_cluster_size, matrix, outprefix):
     cluster_colors = [color_palette[x] if x >= 0
                       else (0.5, 0.5, 0.5)
                       for x in model.labels_]
-    plt.scatter(matrix.values[:,0],matrix.values[:,1], c=cluster_colors)
+    if preproc:
+        standard_embedding = umap.UMAP(random_state=42).fit_transform(matrix.values)
+        plt.scatter(standard_embedding[:,0],standard_embedding[:,1], c=model.labels_, cmap='rainbow')
+    else:
+        plt.scatter(matrix.values[:,0],matrix.values[:,1], c=model.labels_, cmap='rainbow')
     plt.suptitle("HDBSCAN clustering result")
     plt.savefig(outprefix+"_hdbscan_scatter.png")
     plt.clf()
@@ -51,13 +56,13 @@ def main():
 
     args = parser.parse_args()
     if args.preproc:
-        matrix_input = pd.read_csv(input_file, sep="\t", usecols = lambda column : column not in ['CHR', 'START', 'END']).transpose()
+        matrix_input = pd.read_csv(args.file, sep="\t", usecols = lambda column : column not in ['CHR', 'START', 'END']).transpose()
     else:
         matrix_input = pd.read_csv(args.file, index_col=0, sep='\t')
     outprefix = args.outprefix
 
     min_cluster_size = cluster_size(matrix_input)
-    cluster_and_output(min_cluster_size, matrix_input, outprefix)
+    cluster_and_output(min_cluster_size, matrix_input, outprefix, args.preproc)
 
 if __name__ == "__main__":
     sys.exit(main())

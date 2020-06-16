@@ -1,6 +1,7 @@
 #!/usr/bin/envs python
 
 import time
+import umap
 import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.cluster import AffinityPropagation
@@ -19,7 +20,7 @@ def locate_elbow(matrix, outprefix):
     return visualizer.elbow_value_
 """
 
-def cluster_and_output(matrix, outprefix):
+def cluster_and_output(matrix, outprefix, preproc):
     start_time = time.time()
     model = AffinityPropagation().fit(matrix.values)
     end_time = time.time()
@@ -27,7 +28,11 @@ def cluster_and_output(matrix, outprefix):
     clusters.to_csv(outprefix+"_affinity_clusters.csv", sep="\t")
     with open(outprefix+"_affinity_performance.csv", 'w+') as f:
         f.write("computation_time\t"+str(end_time - start_time))
-    plt.scatter(matrix.values[:,0],matrix.values[:,1], c=model.labels_, cmap='rainbow')
+    if preproc:
+        standard_embedding = umap.UMAP(random_state=42).fit_transform(matrix.values)
+        plt.scatter(standard_embedding[:,0],standard_embedding[:,1], c=model.labels_, cmap='rainbow')
+    else:
+        plt.scatter(matrix.values[:,0],matrix.values[:,1], c=model.labels_, cmap='rainbow')
     plt.suptitle("Affinity propagation clustering result")
     plt.savefig(outprefix+"_affinity_scatter.png")
     plt.clf()
@@ -51,7 +56,7 @@ def main():
         matrix_input = pd.read_csv(args.file, index_col=0, sep='\t')
 
     #k = locate_elbow(matrix_input, outprefix)
-    cluster_and_output(matrix_input, outprefix)
+    cluster_and_output(matrix_input, outprefix, args.preproc)
 
 if __name__ == "__main__":
     sys.exit(main())

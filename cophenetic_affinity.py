@@ -83,9 +83,24 @@ def cophenetic_affinity_score(clusters, labels, coph_dist_matrix):
         s = s/n
         S = S + s
     #S = S/NC #cophenetic affinity score
+    return (S / NC)  
 
-    return (S / NC)    
-
+def compute_pvalue(clusters, coph_dist_matrix, obsv_score):
+    n_perm = 1000
+    perm_scores = []
+    for i in range(n_perm):
+        clusters_perm = pd.DataFrame(columns=['cell', 'cluster'])
+        clusters_perm['cell'] = clusters['cell']
+        clusters_perm['cluster'] = np.random.permutation(clusters['cluster'].values)
+        labels_perm = clusters_perm['cluster'].unique()
+        s = cophenetic_affinity_score(clusters_perm, labels_perm, coph_dist_matrix)
+        perm_scores.append(s)
+    p_val = 0.0 
+    for s in perm_scores:
+        if s > obsv_score:
+            p_val = p_val + 1
+    return (p_val / n_perm)
+          
 def main():
     parser = argparse.ArgumentParser(description="Cophenetic Affinity Score.")
 
@@ -125,11 +140,13 @@ def main():
 
     try:
         S = cophenetic_affinity_score(clusters, labels, matrix)
+        #pvalue = compute_pvalue(clusters, matrix, S)
         #print("cophenetic_affinity_score: " + str(S))
     except ValueError:
         S = "impossible"
+        #pvalue = 0.0
        #print("Too fiew clusters.")
-
+    
     with open(args.stats, 'a') as f:
         f.write("\n")
         f.write("n_outliers:\t" + str(n_outliers) + "\n")
@@ -137,6 +154,8 @@ def main():
         f.write("n_singletons:\t" + str(n_singletons)+ "\n")
         f.write("n_clusters_filtered:\t" + str(n_labels_filt)+ "\n")
         f.write("cophenetic_affinity_score:\t" + str(S)+ "\n")
+    
+    #print("Cophenetic_affinity_score: " + str(S) + " - pvalue: " + str(pvalue))
 if __name__ == "__main__":
         sys.exit(main())
   

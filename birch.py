@@ -1,4 +1,5 @@
 import time
+import umap
 import pandas as pd
 import operator
 from sklearn import metrics
@@ -38,7 +39,7 @@ def locate_elbow(matrix, outprefix):
     return visualizer.elbow_value_
 
 
-def cluster_and_output(k, matrix, outprefix):
+def cluster_and_output(k, matrix, outprefix, preproc):
     start_time = time.time()
     model = Birch(branching_factor=20, n_clusters=int(k), threshold=0.5, compute_labels=True).fit(matrix.values)
     end_time = time.time()
@@ -46,7 +47,11 @@ def cluster_and_output(k, matrix, outprefix):
     clusters.to_csv(outprefix+"_birch_clusters.csv", sep="\t")
     with open(outprefix+"_birch_performance.csv", 'w+') as f:
         f.write("computation_time\t"+str(end_time - start_time))
-    plt.scatter(matrix.values[:,0],matrix.values[:,1], c=model.labels_, cmap='rainbow')
+    if preproc:
+        standard_embedding = umap.UMAP(random_state=42).fit_transform(matrix.values)
+        plt.scatter(standard_embedding[:,0],standard_embedding[:,1], c=model.labels_, cmap='rainbow')
+    else:
+        plt.scatter(matrix.values[:,0],matrix.values[:,1], c=model.labels_, cmap='rainbow')
     plt.suptitle("Birch clustering result")
     plt.savefig(outprefix+"_birch_scatter.png")
     plt.clf()
@@ -71,7 +76,7 @@ def main():
     outprefix = args.outprefix
 
     k = locate_elbow(matrix_input, outprefix)
-    cluster_and_output(k, matrix_input, outprefix)
+    cluster_and_output(k, matrix_input, outprefix, args.preproc)
 
 if __name__ == "__main__":
     sys.exit(main())

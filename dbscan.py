@@ -1,4 +1,5 @@
 import time
+import umap
 import pandas as pd
 import seaborn as sns
 import numpy as np
@@ -40,7 +41,7 @@ def find_opt_eps(matrix, outprefix):
     plt.clf()
     return eps
 
-def cluster_and_output(matrix, outprefix, eps):
+def cluster_and_output(matrix, outprefix, eps, preproc):
     start_time = time.time()
     model = DBSCAN(eps=eps).fit(matrix.values)
     end_time = time.time()
@@ -52,7 +53,11 @@ def cluster_and_output(matrix, outprefix, eps):
     cluster_colors = [color_palette[x] if x >= 0
                       else (0.5, 0.5, 0.5)
                       for x in model.labels_]
-    plt.scatter(matrix.values[:,0],matrix.values[:,1], c=cluster_colors)
+    if preproc:
+        standard_embedding = umap.UMAP(random_state=42).fit_transform(matrix.values)
+        plt.scatter(standard_embedding[:,0],standard_embedding[:,1], c=model.labels_, cmap='rainbow')
+    else:
+        plt.scatter(matrix.values[:,0],matrix.values[:,1], c=model.labels_, cmap='rainbow')
     plt.suptitle("DBSCAN clustering result")
     plt.savefig(outprefix+"_dbscan_scatter.png")
     plt.clf()
@@ -77,7 +82,7 @@ def main():
     outprefix = args.outprefix
 
     eps = find_opt_eps(matrix_input, outprefix)
-    cluster_and_output(matrix_input, outprefix, eps)
+    cluster_and_output(matrix_input, outprefix, eps, args.preproc)
 
 if __name__ == "__main__":
     sys.exit(main())

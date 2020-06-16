@@ -2,6 +2,7 @@
 
 import time
 import pandas as pd
+import umap
 import matplotlib.pyplot as plt
 from sklearn.cluster import AgglomerativeClustering
 from yellowbrick.cluster import KElbowVisualizer
@@ -22,7 +23,7 @@ def locate_elbow(matrix, outprefix, linkage):
     return visualizer.elbow_value_
 
 
-def cluster_and_output(k, matrix, outprefix, linkage):
+def cluster_and_output(k, matrix, outprefix, linkage, preproc):
     start_time = time.time()
     if linkage == "ward":
         affinity="euclidean"
@@ -34,7 +35,11 @@ def cluster_and_output(k, matrix, outprefix, linkage):
     clusters.to_csv(outprefix+"_agglomerative_" + linkage + "_clusters.csv", sep="\t")
     with open(outprefix+"_agglomerative_" + linkage + "_performance.csv", 'w+') as f:
         f.write("computation_time\t"+str(end_time - start_time))
-    plt.scatter(matrix.values[:,0],matrix.values[:,1], c=model.labels_, cmap='rainbow')
+    if preproc:
+        standard_embedding = umap.UMAP(random_state=42).fit_transform(matrix.values)
+        plt.scatter(standard_embedding[:,0],standard_embedding[:,1], c=model.labels_, cmap='rainbow')
+    else:
+        plt.scatter(matrix.values[:,0],matrix.values[:,1], c=model.labels_, cmap='rainbow')
     plt.suptitle("Agglomerative clustering result (linkage = {})".format(linkage))
     plt.savefig(outprefix+"_agglomerative_" + linkage + "_scatter.png")
     plt.clf()
@@ -62,7 +67,7 @@ def main():
     linkage = args.linkage
 
     k = locate_elbow(matrix_input, outprefix, linkage)
-    cluster_and_output(k, matrix_input, outprefix, linkage)
+    cluster_and_output(k, matrix_input, outprefix, linkage, args.preproc)
 
 if __name__ == "__main__":
     sys.exit(main())
