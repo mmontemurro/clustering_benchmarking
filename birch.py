@@ -1,11 +1,13 @@
 import time
 import umap
+import operator
 import pandas as pd
 import operator
 from sklearn import metrics
 import matplotlib.pyplot as plt
 from sklearn.cluster import Birch
 from yellowbrick.cluster import KElbowVisualizer
+from sklearn.metrics import silhouette_score
 
 import argparse, os, sys
 
@@ -28,10 +30,33 @@ def calinski_harabasz(matrix, outprefix):
     plt.clf()
     return k
 
+def silhouette_score_(matrix, outprefix):
+    s_dict = {}
+   
+    for k in range(2,21):
+        model = Birch(branching_factor=20, n_clusters=int(k), threshold=0.5, compute_labels=True).fit(matrix.values)
+        s_dict[k] = silhouette_score(matrix.values, model.labels_)
+        
+    optK = max(s_dict.items(), key=operator.itemgetter(1))[0]
+    lists = sorted(s_dict.items())
+    x, y = zip(*lists) 
+    plt.title("Birch model silhouette score \nfor determining number of clusters\n",fontsize=16)
+    plt.scatter(x=x,y=y,s=150,edgecolor='k')
+    plt.axvline(x=optK, color='k', linestyle='--', label="optK")
+    plt.grid(True)
+    plt.legend(fontsize=18)
+    plt.xlabel("Number of clusters",fontsize=14)
+    plt.ylabel("Silhouette score",fontsize=15)
+    plt.xticks([i for i in range(2,21)],fontsize=14)
+    plt.yticks(fontsize=15)
+    plt.savefig(outprefix+"_birch_silhouette_score.png")
+    plt.clf()
+    return optK
+
 
 def locate_elbow(matrix, outprefix):
     model = Birch(branching_factor=20, threshold=0.5, compute_labels=True)
-    visualizer = KElbowVisualizer(model, k=(2,20))
+    visualizer = KElbowVisualizer(model, k=(2,50),  metric='silhouette')
     visualizer.fit(matrix.values)
     visualizer.finalize()
     plt.savefig(outprefix+"_birch_elbow.png")
@@ -75,7 +100,7 @@ def main():
         matrix_input = pd.read_csv(args.file, index_col=0, sep='\t')
     outprefix = args.outprefix
 
-    k = locate_elbow(matrix_input, outprefix)
+    k = silhouette_score_(matrix_input, outprefix)
     cluster_and_output(k, matrix_input, outprefix, args.preproc)
 
 if __name__ == "__main__":

@@ -143,17 +143,17 @@ def main():
         #pvalue = compute_pvalue(clusters, matrix, S)
         #print("cophenetic_affinity_score: " + str(S))
     except ValueError:
-        S = "impossible"
+        S = 'NaN'
         #pvalue = 0.0
        #print("Too fiew clusters.")
     
     with open(args.stats, 'a') as f:
         f.write("\n")
-        f.write("n_outliers:\t" + str(n_outliers) + "\n")
-        f.write("n_clusters_unfiltered:\t" + str(n_labels_unfilt)+ "\n")
-        f.write("n_singletons:\t" + str(n_singletons)+ "\n")
-        f.write("n_clusters_filtered:\t" + str(n_labels_filt)+ "\n")
-        f.write("cophenetic_affinity_score:\t" + str(S)+ "\n")
+        f.write("n_outliers\t" + str(n_outliers) + "\n")
+        f.write("n_clusters_unfiltered\t" + str(n_labels_unfilt)+ "\n")
+        f.write("n_singletons\t" + str(n_singletons)+ "\n")
+        f.write("n_clusters_filtered\t" + str(n_labels_filt)+ "\n")
+        f.write("cophenetic_affinity_score\t" + str(S)+ "\n")
     
     #print("Cophenetic_affinity_score: " + str(S) + " - pvalue: " + str(pvalue))
 if __name__ == "__main__":

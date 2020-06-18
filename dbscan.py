@@ -28,9 +28,10 @@ def find_opt_eps(matrix, outprefix):
     distances, indices = nbrs.kneighbors(X)
     distances = np.sort(distances, axis=0)
     y = distances[:,1]
-    x = range(1, len(y) + 1)
+    x = range(0, len(y))
     kn = KneeLocator(x, y, curve='convex', direction='increasing')
     eps = y[kn.knee]
+    """
     plt.xlabel('samples')
     plt.ylabel('eps')
     plt.plot(x, y, 'bx-')
@@ -39,6 +40,7 @@ def find_opt_eps(matrix, outprefix):
     plt.legend(fontsize=18)
     plt.savefig(outprefix+"_dbscan_eps.png")
     plt.clf()
+    """
     return eps
 
 def cluster_and_output(matrix, outprefix, eps, preproc):
@@ -49,6 +51,7 @@ def cluster_and_output(matrix, outprefix, eps, preproc):
     clusters.to_csv(outprefix+"_dbscan_clusters.csv", sep="\t")
     with open(outprefix+"_dbscan_performance.csv", 'w+') as f:
         f.write("computation_time\t"+str(end_time - start_time))
+        f.write("DBSCAN_eps\t"+str(eps))
     color_palette = sns.color_palette("rainbow", len(np.unique(model.labels_)))
     cluster_colors = [color_palette[x] if x >= 0
                       else (0.5, 0.5, 0.5)
@@ -82,7 +85,9 @@ def main():
     outprefix = args.outprefix
 
     eps = find_opt_eps(matrix_input, outprefix)
-    cluster_and_output(matrix_input, outprefix, eps, args.preproc)
+    with open(outprefix+"_dbscan_performance.csv", 'a') as f:
+        f.write("DBSCAN_eps\t"+str(eps))
+    #cluster_and_output(matrix_input, outprefix, eps, args.preproc)
 
 if __name__ == "__main__":
     sys.exit(main())

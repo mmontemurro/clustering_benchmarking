@@ -31,6 +31,7 @@ def cluster_and_output(min_cluster_size, matrix, outprefix, preproc):
     clusters.to_csv(outprefix+"_hdbscan_clusters.csv", sep="\t")
     with open(outprefix+"_hdbscan_performance.csv", 'w+') as f:
         f.write("computation_time\t"+str(end_time - start_time))
+        #f.write("HDBSCAN_min_cluster_size\t"+str(min_cluster_size))
     color_palette = sns.color_palette("rainbow", len(np.unique(model.labels_)))
     cluster_colors = [color_palette[x] if x >= 0
                       else (0.5, 0.5, 0.5)
@@ -62,7 +63,9 @@ def main():
     outprefix = args.outprefix
 
     min_cluster_size = cluster_size(matrix_input)
-    cluster_and_output(min_cluster_size, matrix_input, outprefix, args.preproc)
+    with open(outprefix+"_hdbscan_performance.csv", 'a') as f:
+        f.write("HDBSCAN_min_cluster_size\t"+str(min_cluster_size))
+    #cluster_and_output(min_cluster_size, matrix_input, outprefix, args.preproc)
 
 if __name__ == "__main__":
     sys.exit(main())
