@@ -1,6 +1,4 @@
-# Clustering benchmarking
-
-This repository contains the code used for 
+#!/usr/bin/bash
 
 #gdrive URL for reference genome = https://drive.google.com/file/d/1Q1e0QTltVQYgMK0POFZRPLeSwj0BsUwW/view?usp=sharing
 
