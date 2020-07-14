@@ -1,0 +1,8 @@
+*dataset*
+
+*__pycache__*
+
+*.log
+*.sbatch
+*.swp
+
