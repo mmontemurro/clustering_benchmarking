@@ -77,7 +77,7 @@ def gen_reads(dir, index, leaf_index, all_chrlen, fa_prefix, Alpha, Beta, x0, y0
                 #out_fq1 = out_fq_prefix + "_1.fq"
                 #out_fq2 = out_fq_prefix + "_2.fq"
                 if N_true == 1:
-                    args = wgsim_dir + "/wgsim -h -N " + str(this_readcount) + " -1 " + str(l) + " -2 " + str(l) + " " + tmp_fa_file + " " + out_fq1 + " " + out_fq2
+                    args = wgsim_dir + "wgsim -h -N " + str(this_readcount) + " -1 " + str(l) + " -2 " + str(l) + " " + tmp_fa_file + " " + out_fq1 + " " + out_fq2
                     print(args)
                     try:
                         subprocess.check_call(args, shell=True)
@@ -179,6 +179,9 @@ parser.add_argument('-E', '--whole-amp-num', default=1)
 parser.add_argument('-J', '--amp-num-geo-par', default=1)
 parser.add_argument('-Y', '--leaf-index-range', default="-1")
 parser.add_argument('-I', '--leaf-ID-range', default="-1")
+####
+parser.add_argument('-N', '--npy')
+parser.add_argument('-s', '--leaf_num_save', type=int, default=0)
 
 
 args = parser.parse_args()
@@ -252,12 +255,16 @@ def check_Ns(file):
         return 0
     return 1
 
-
-
 # Step 1. generate a phylogentic tree that has copy number alterations on branches.
 # Now all CNs are in tree, not generating fa or remember it in the tree nodes.
 if skip == 0:
-    [leaf_chrlen, leaf_index, chr_name_array, tree] = gen_tree(n, Beta, Alpha, Delta, dir, cn_num, del_rate, min_cn_size, exp_theta, amp_p, template_ref, outfile, fa_prefix, snv_rate, root_mult, whole_amp, whole_amp_rate, whole_amp_num, amp_num_geo_par)
+    # call with last arg as True if template is fasta, otherwise we load from fa_prefix the three npy
+    if args.npy is None:
+        [leaf_chrlen, leaf_index, chr_name_array, tree] = gen_tree(n, Beta, Alpha, Delta, dir, cn_num, del_rate, min_cn_size, exp_theta, amp_p, template_ref, outfile, fa_prefix, snv_rate, root_mult, whole_amp, whole_amp_rate, whole_amp_num, amp_num_geo_par, True, args.leaf_num_save)
+    else:
+        ## VODKA
+        print("Recovering from npy " + args.npy)
+        [leaf_chrlen, leaf_index, chr_name_array, tree] = gen_tree(n, Beta, Alpha, Delta, dir, cn_num, del_rate, min_cn_size, exp_theta, amp_p, template_ref, outfile, fa_prefix, snv_rate, root_mult, whole_amp, whole_amp_rate, whole_amp_num, amp_num_geo_par, False, args.leaf_num_save, args.npy)
     numpy.save(save_prefix + ".leaf_chrlen.npy", leaf_chrlen)
     numpy.save(save_prefix + ".leaf_index.npy", leaf_index)
     numpy.save(save_prefix + ".chr_name_array.npy", chr_name_array)
@@ -278,21 +285,10 @@ if skip == 1:
     chr_name_array_f = save_prefix + ".chr_name_array.npy"
     tree_f = save_prefix + ".tree.npy"
     #ref_f = save_prefix + ".ref.npy"
-    
-    # save np.load
-    np_load_old = numpy.load
-
-    # modify the default parameters of np.load
-    numpy.load = lambda *a,**k: np_load_old(*a, allow_pickle=True, **k)
-    
     leaf_chrlen = numpy.load(leaf_chrlen_f)
     leaf_index = numpy.load(leaf_index_f)
     chr_name_array = numpy.load(chr_name_array_f)
-    tree = numpy.load(tree_f)
-    
-    # restore np.load for future normal usage
-    numpy.load = np_load_old
-    
+    tree = numpy.load(tree_f, allow_pickle=True)
     [ref, tmp_chr_name, tmp_len_chr] = init_ref(template_ref)
     #ref = numpy.load(ref_f)
     #print(leaf_chrlen_f)
@@ -332,7 +328,7 @@ if skip == 1:
                 #popen = subprocess.Popen(args, stdout=subprocess.PIPE, shell=True)
                 #popen.wait()
         
-            processes.append(mp.Process(target=gen_reads, args=(dir, index, leaf_index, all_chrlen, fa_prefix, Alpha, Beta, x0, y0, cov, l, window_size, u, chr_name_array)))
+            #processes.append(mp.Process(target=gen_reads, args=(dir, index, leaf_index, all_chrlen, fa_prefix, Alpha, Beta, x0, y0, cov, l, window_size, u, chr_name_array)))
     
         index = index + 1
 

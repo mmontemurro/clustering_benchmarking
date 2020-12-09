@@ -71,6 +71,52 @@ def init_ref(template):
     ref_diploid = [ref, ref]
     return ref_diploid, chr_name, len_chr
 
+def init_ref_alleles(templ1, templ2):
+    # read the template fasta file and save to ref array
+    ref1 = []
+    ref2 = []
+    chr_name = []
+    len_chr = []
+    file = open(templ1,"r")
+    line = "tmp"
+    # initialize string
+    str_ = ""
+    line = file.readline().rstrip('\n')
+    while(line != ""):
+        if line[0] == '>':
+            chr_name.append(line[1:])
+            if str_ != "":
+                ref1.append(str_)
+                len_chr.append(len(str_))
+            str_ = ""
+        else:
+            str_ = str_ + line
+        line = file.readline().rstrip('\n')
+    ref1.append(str_)
+    len_chr.append(len(str_))
+    file.close()
+
+    file = open(templ2,"r")
+    line = "tmp"
+    # initialize string
+    str_ = ""
+    line = file.readline().rstrip('\n')
+    while(line != ""):
+        if line[0] == '>':
+            chr_name.append(line[1:])
+            if str_ != "":
+                ref2.append(str_)
+                len_chr.append(len(str_))
+            str_ = ""
+        else:
+            str_ = str_ + line
+        line = file.readline().rstrip('\n')
+    ref2.append(str_)
+    len_chr.append(len(str_))
+    file.close()
+    ref_diploid = [ref1, ref2]
+    return ref_diploid, chr_name, len_chr
+
 def gen_ref(ref, CNs):
     # return this reference
     ret_ref = [row[:] for row in ref]

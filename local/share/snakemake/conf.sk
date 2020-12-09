@@ -12,7 +12,7 @@ PRJ_ROOT=find_prj_root()
 ROOT = os.path.dirname(PRJ_ROOT)
 SRC_DIR=PRJ_ROOT+'/local/src'
 BIN_DIR=PRJ_ROOT+'/local/bin'
-SHR_DIR=PRJ_ROOT+'/local/bin'
+SHR_DIR=PRJ_ROOT+'/local/share'
 DATASET_DIR=PRJ_ROOT+'/dataset'
 PLH_DIR=DATASET_DIR+"/snake_workflow"
 
@@ -25,8 +25,8 @@ GINKGO_BINS=SHR_DIR+"/data/ginkgo_variable_500000_bins.bed"
 
 WGSIM=SRC_DIR+"/cnsc_simulator"
 
-SIMULATOR=BIN_DIR+"main.par"
-MAKE_GT=BIN_DIR+"read_tree"
+SIMULATOR=BIN_DIR+"/main.par"
+MAKE_GT=BIN_DIR+"/read_tree"
 SPLIT_GT=BIN_DIR+"/sep_ground_truth"
 BIN_GT=BIN_DIR+"/make_ginkgo_beds"
 MK_SEGCOPY=BIN_DIR+"/make_segcopy"
@@ -88,6 +88,21 @@ EXP = {
 
 }
 
+SMALL_GENOME=SHR_DIR+"/data/small_genome.fa"
+
+EXP_PHYLICS = {
+    "Exp1" : {
+        "n" : 2500
+    },
+    "Exp2" : {
+        "n" : 2500
+    },
+    "Exp3" : {
+        "n" : 2500
+    }
+
+}
+
 SAMPLES=["Sample1", "Sample2", "Sample3", "Sample4", "Sample5",
         "Sample6", "Sample7", "Sample8", "Sample9", "Sample10",
         "Sample11", "Sample12", "Sample13", "Sample14", "Sample15",
@@ -99,3 +114,6 @@ SAMPLES=["Sample1", "Sample2", "Sample3", "Sample4", "Sample5",
         "Sample41", "Sample42", "Sample43", "Sample44", "Sample45",
         "Sample46", "Sample47", "Sample48", "Sample49", "Sample50",
         ] 
+    
+SAMPLES_PHYLICS = ["Sample1", "Sample2"]
+

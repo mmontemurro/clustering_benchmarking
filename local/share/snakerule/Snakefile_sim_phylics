@@ -1,0 +1,151 @@
+include: "../snakemake/conf.sk"
+
+#  -p PROCESSORS,  the number of processors being used for parallelization. Step 2 is where the parallelization is feasible. 
+#  -r DIRECTORY, the folder where the simulated data will be put.
+#  -S WGSIM_DIR, absolute path of where the wgsim binary is
+#  -n number of cells in the tree
+#  -c CN_NUM, --cn-num CN_NUM
+#  -d DEL_RATE, --del-rate DEL_RATE
+#  -m MIN_CN_SIZE, minimum copy number size.
+#  -e EXP_THETA, parameter p in exponential distribution for the copy number size that will be added to $m
+#  -a AMP_P, --amp-p AMP_P
+#  -t TEMPLATE_REF, reference fasta file in an absolute path. 
+#  -o OUTFILE, --outfile OUTFILE
+#  -f FA_PREFIX, --fa-prefix FA_PREFIX
+#  -x LORENZ_X, --Lorenz-x LORENZ_X
+#  -y LORENZ_Y, --Lorenz-y LORENZ_Y
+#  -v COVERAGE, --coverage COVERAGE
+#  -l READLEN, read length
+#  -w WINDOW_SIZE, --window-size WINDOW_SIZE
+#  -u ACCEPTANCE_RATE, --acceptance-rate ACCEPTANCE_RATE
+#  -k SKIP_FIRST_STEP, --skip-first-step SKIP_FIRST_STEP
+#  -R SNV_RATE, --snv_rate SNV_RATE
+#  -X how much more CNAs on the edge to the root than other edges. For example, 8
+#  -W WHOLE_AMP, if there are whole chromosomal amplifications, 1 (yes) or 0 (no). 
+#  -C WHOLE_AMP_RATE, the probability that a chromosome may be amplified if $W is 1. 
+#  -E WHOLE_AMP_NUM, --whole-amp-num WHOLE_AMP_NUM
+#  -J AMP_NUM_GEO_PAR, --amp-num-geo-par AMP_NUM_GEO_PAR
+#  -Y LEAF_INDEX_RANGE, generate the reads for from leaf $a to leaf $b - 1. -Y option is for parallelize the process of generating the reads.
+#  -I LEAF_ID_RANGE, --leaf-ID-range LEAF_ID_RANGE
+
+__data_folder__ = DATASET_DIR+"{exp}/data"
+__out_folder__ = DATASET_DIR+"{exp}/data"
+__plh_dir__ = DATASET_DIR+"snake_workflow"
+
+
+
+rule simulate: #from tutorial https://bitbucket.org/xianfan/cnsc_simulator/src/master/
+    output: touch(__plh_dir__+"/{exp}-{sample}-sim.done")
+    params: script=SIMULATOR, wgsim=WGSIM, n=lambda wildcards: EXP[wildcards.exp]["n"], p=1, ref=REF,
+                X= 8, W=1, 
+                C= 0.3, E=1, 
+                d= 0.5, c = 1,
+                l=100, m=2000000, e=5000000, outdir=__out_folder__+"/{sample}",
+                snake_workflow =__plh_dir__
+    shell:
+        """
+            if [ ! -d {params.snake_workflow} ]; then
+                mkdir -p {params.snake_workflow}
+            fi
+
+            if [ ! -d {wildcards.exp}/data ]; then
+                mkdir -p {wildcards.exp}/data
+            fi
+
+            python {params.script} -S {params.wgsim} -r {params.outdir} -n {params.n} -p {params.p} -X \
+                {params.X} -t {params.ref} -W {params.W} -C {params.C} -E {params.E} -d {params.d} -c {params.c}\
+                -l {params.l} -m {params.m} -e {params.e}
+        """
+
+
+rule make_ground_truth:
+    input: __plh_dir__+"/{exp}-{sample}-sim.done"
+    output: touch(__plh_dir__+"/{exp}-{sample}-mk-gt.done")
+    params: script=MAKE_GT, outfile=__out_folder__+"/{sample}/gt.all.csv", infile=__out_folder__+"/{sample}/from_first_step.tree.npy"
+    shell:
+        """
+            python {params.script} -s -f {params.infile} > {params.outfile}
+        """
+
+
+rule split_ground_truth:
+    input: __plh_dir__+"/{exp}-{sample}-mk-gt.done"
+    output: touch(__plh_dir__+"/{exp}-{sample}-split-gt.done")
+    params: script=SPLIT_GT, prefix=__out_folder__+"/{sample}/gt_sep/cell", outdir=__out_folder__+"/{sample}/gt_sep", infile=__out_folder__+"/{sample}/gt.all.csv", leaves_f="{exp}/{sample}/from_first_step.leaf_index.npy"
+    shell:
+        """
+            if [ ! -d {params.outdir} ]; then
+                mkdir -p {params.outdir}
+            fi
+
+            python {params.script} {params.infile} {params.leaves_f} {params.prefix}
+
+        """
+
+rule fix_beds:
+    input: __plh_dir__+"/{exp}-{sample}-split-gt.done"
+    output: touch(__plh_dir__+"/{exp}-{sample}-fix-beds.done"), 
+    params: indir=__out_folder__+"/{sample}/gt_sep", outdir=__out_folder__+"/{sample}/gt_sep/1_based"
+    shell:
+        """
+            if [ ! -d {params.outdir} ]; then
+                mkdir -p {params.outdir}
+            fi
+
+            for bed in {params.indir}/*.bed; do 
+                bed_name=$(basename $bed)
+                while read chr start end cn; do 
+                    echo -e $chr'\t'$((start+1))'\t'$((end + 1))'\t'$cn 
+                done < $bed > {params.outdir}/$bed_name
+            done
+        """
+
+rule isec_beds:
+    input: __plh_dir__+"/{exp}-{sample}-fix-beds.done"
+    output: touch(__plh_dir__+"/{exp}-{sample}-isec-beds.done")
+    params: ginkgo_bed=GINKGO_BINS, indir=__out_folder__+"/{sample}/gt_sep/1_based",outdir=__out_folder__+"/{sample}/gt_sep/isec_beds"
+    shell:
+        """
+            if [ ! -d {params.outdir} ]; then
+                mkdir -p {params.outdir}
+            fi
+
+
+            for bed in {params.indir}/*.bed; do 
+                base=$(basename $bed)
+                bedtools intersect -a {params.ginkgo_bed} -b $bed -loj > {params.outdir}/$base
+            done
+        """
+
+rule bin_gt:
+    input: __plh_dir__+"/{exp}-{sample}-isec-beds.done"
+    output: touch(__plh_dir__+"/{exp}-{sample}-bin-gt.done")
+    params: script=BIN_GT, indir=__out_folder__+"/{sample}/gt_sep/isec_beds", outdir=__out_folder__+"/{sample}/gt_sep/binned"
+    shell:
+        """
+            if [ ! -d {params.outdir} ]; then
+                mkdir -p {params.outdir}
+            fi
+            python {params.script} {params.indir} {params.outdir}
+        """ 
+rule mk_segcopy:
+    input: __plh_dir__+"/{exp}-{sample}-bin-gt.done"
+    output: touch(__plh_dir__+"/{exp}-{sample}-mk-segcopy.done")
+    params: script=MK_SEGCOPY, outdir=__out_folder__+"/{sample}/gt_merged", indir=__out_folder__+"/{sample}/gt_sep/binned"
+    shell:
+        """
+            if [ ! -d {params.outdir} ]; then
+                mkdir -p {params.outdir}
+            fi
+
+            python {params.script} {params.indir} {params.outdir}
+        """
+
+rule mk_heatmap:
+    input: __plh_dir__+"/{exp}-{sample}-mk-segcopy.done"
+    output: touch(__plh_dir__+"/{exp}-{sample}-heatmap.done")
+    params: script=HEATMAP, outdir=__out_folder__+"/{sample}/gt_merged", infile=__out_folder__+"/{sample}/gt_merged/SegCopy"
+    shell:
+        """
+            python {params.script} {params.infile} {params.outdir}
+        """

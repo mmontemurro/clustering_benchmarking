@@ -4,6 +4,7 @@
 
 from CN import CN
 import os
+import numpy as np
 
 def make_fa(ID, tree, ref, chr_name_array, fa_prefix):
     fa_f_prefix = fa_prefix + str(ID) + "_"
@@ -44,6 +45,37 @@ def getlen_ref(template):
     file.close()
     return chr_name, len_chr
 
+
+def init_ref_from_npy(prefix, template):
+    # read a template from npy objects representing a leaf obtained from a previous run
+    len_chr_cell = np.load(prefix + ".leaf_chrlen.npy", allow_pickle=True)
+    #leaf_index = np.load(prefix + ".leaf_index.npy", allow_pickle=True) # not used right now
+    #chr_name = np.load(prefix + ".chr_name_array.npy", allow_pickle=True)
+    #ref = np.load(prefix + ".ref_array.npy", allow_pickle=True)
+    corres = np.load(prefix + ".corres_array.npy", allow_pickle=True)
+    ref = []
+    chr_name = []
+    len_chr = []
+    file = open(template,"r")
+    line = "tmp"
+    # initialize string
+    str_ = ""
+    line = file.readline().rstrip('\n')
+    while(line != ""):
+        if line[0] == '>':
+            chr_name.append(line[1:])
+            if str_ != "":
+                ref.append(str_)
+                len_chr.append(len(str_))
+            str_ = ""
+        else:
+            str_ = str_ + line
+        line = file.readline().rstrip('\n')
+    ref.append(str_)
+    len_chr.append(len(str_))
+    file.close()
+    ref_diploid = [ref, ref]
+    return ref_diploid, chr_name, len_chr, len_chr_cell[0], len_chr_cell[1], list(corres)
 
 def init_ref(template):
     # read the template fasta file and save to ref array
@@ -122,6 +154,7 @@ def write_ref(ref, chr_name, fasta):
     # write the reference to a fasta file
     line_len = 60
     for i in [1, 2]:
+        print("Writing to fasta" + str(i) + " .fa")
         file = open(fasta + str(i) + ".fa", "w")
         for j in range(len(ref[i-1])):
             file.write(">"+chr_name[j]+"\n")
@@ -136,3 +169,20 @@ def write_ref(ref, chr_name, fasta):
                 if len(tmp_str) > 0:
                     file.write(tmp_str[a:] + "\n")
         file.close()
+
+
+def make_ref(ID, tree, ref):
+    # record all the nodes that this route visited (from leaf to root)
+    trace = [ID]
+    visit = ID
+    while visit != 0:
+        visit = tree[visit].parentID
+        trace.append(visit)
+    # now reverse the trace so that the CNV can be applied from root to leaf
+    CN = []
+    for i in range(len(trace)):
+        j = len(trace) - i - 1
+        # gather all CNs together
+        for cn in tree[trace[j]].cn:
+            CN.append(cn)
+    return gen_ref(ref, CN)

@@ -19,7 +19,7 @@ import sys
 import re
 from anytree.dotexport import RenderTreeGraph
 from CN import CN
-from Gen_Ref_Fa import gen_ref, init_ref, write_ref, read_ref
+from Gen_Ref_Fa import gen_ref, init_ref, write_ref, read_ref, init_ref_alleles
 
 nuc_array = ['A', 'B', 'C', 'D']
 # for test purpose
@@ -105,7 +105,7 @@ def get_range(chr_len, min_cn_size, exp_theta, CN_LIST_ID):
     else:
         skip = 0
         #skip = 5000000 
-        # not try any more if cannot find a good one, just use the end
+        # not try any more if cannot find a good one, just use the endgen_tree.py
         trials = 0
         max_n = 10
         cn_size = np.random.exponential(exp_theta) + min_cn_size
@@ -243,7 +243,7 @@ def add_CN(chrlen, cn_num, del_rate, min_cn_size, exp_theta, amp_p, corres, CN_L
                 CN_amp_num_ = np.random.geometric(amp_p, 1)
                 CN_amp_num = int(CN_amp_num_[0])
                 if CN_amp_num >= 1:
-                    break;
+                    break
             if random == 0:
                 CN_amp_num = amp_num_list[i]
             #CN_amp_num = int(np.random.geometric(amp_p, 1) - 1)
@@ -848,7 +848,9 @@ def print_chr_len(chrlen_array):
 # whole_amp: if there's whole chromosome amplification
 # whole_amp_rate: rate of an allele on a chromosome chosen to be amplified. 
 # whole_amp_num: the mean of the number of copies added
-def gen_tree(n, Beta, Alpha, Delta, Output, cn_num, del_rate, min_cn_size, exp_theta, amp_p, template_ref, outfile, fa_prefix, snv_rate, root_mult, whole_amp, whole_amp_rate, whole_amp_num, amp_num_geo_par):
+
+def gen_tree(n, Beta, Alpha, Delta, Output, cn_num, del_rate, min_cn_size, exp_theta, amp_p, 
+                template_ref1, template_ref2, outfile, fa_prefix, snv_rate, root_mult, whole_amp, whole_amp_rate, whole_amp_num, amp_num_geo_par):
     #n = 4
     #Beta = 0.5
     #Alpha = 0.5
@@ -929,7 +931,8 @@ def gen_tree(n, Beta, Alpha, Delta, Output, cn_num, del_rate, min_cn_size, exp_t
     
     root=MyNode("0: [0,1]")
     root.tuple=[0,1]
-    ref_array, chr_name_array, chr_sz = init_ref(template_ref)
+    ref_array, chr_name_array, chr_sz = init_ref_alleles(template_ref1, template_ref2)
+    #ref_array, chr_name_array, chr_sz = init_ref(template_ref)
     chr_sz1 = []
     # data structure for corresponding coordinates for calculating the actual CNV on reference
     # copy so that the two arrays of allele length are independent

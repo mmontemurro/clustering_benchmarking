@@ -19,7 +19,10 @@ import sys
 import re
 from anytree.dotexport import RenderTreeGraph
 from CN import CN
-from Gen_Ref_Fa import gen_ref, init_ref, write_ref, read_ref
+from Gen_Ref_Fa import gen_ref, init_ref, write_ref, read_ref, init_ref_from_npy, make_ref
+from json import JSONEncoder
+from json import dump
+
 
 nuc_array = ['A', 'B', 'C', 'D']
 # for test purpose
@@ -53,6 +56,36 @@ amp_num_list = [1, 0, 3, 3, 0, 0, 0, 0, 0]
 #cn_list2 = [20,45,40]
 #if_del_list = [1,1]
 
+#json encoder
+class MyEncoder(JSONEncoder):
+    def default(self, o):
+        #print("Encoder:")
+        #print(o)
+        return o.__dict__  
+"""
+class MovementEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.ndarray):
+            if obj.flags['C_CONTIGUOUS']:
+                obj_data = obj.data
+            else:
+                cont_obj = np.ascontiguousarray(obj)
+                assert(cont_obj.flags['C_CONTIGUOUS'])
+                obj_data = cont_obj.data
+            ## data_b64 = base64.b64encode(obj_data)
+            ## converting to base64 and returning a dictionary did not work
+            ## return dict(__ndarray__ = data_b64, dtype = str(obj.dtype), shape = obj.shape)
+            return obj.tolist()  ## instead, utilize numpy builtin tolist() method
+        try:
+            my_dict = obj.__dict__   ## <-- ERROR raised here
+        except TypeError:
+            pass
+        else:
+            return my_dict
+        return json.JSONEncoder.default(self, obj)
+"""
+
+    
 
 # definition of one SNV
 class MySNV():
@@ -69,6 +102,10 @@ class corres_coord():
         #corres_coord.__init__(self, r1, r2, g1, g2)
         self.ref = [r1, r2]
         self.gen = [g1, g2]
+
+    ## VODKA, to better grasp the internal representation
+    def __str__(self):
+        return "<corres_coord ref:{ref} gen:{gen}>".format(ref=self.ref, gen=self.gen)
 
 class MyNode(Node):
     def __init__(self, name, parent=None):
@@ -243,7 +280,7 @@ def add_CN(chrlen, cn_num, del_rate, min_cn_size, exp_theta, amp_p, corres, CN_L
                 CN_amp_num_ = np.random.geometric(amp_p, 1)
                 CN_amp_num = int(CN_amp_num_[0])
                 if CN_amp_num >= 1:
-                    break;
+                    break
             if random == 0:
                 CN_amp_num = amp_num_list[i]
             #CN_amp_num = int(np.random.geometric(amp_p, 1) - 1)
@@ -324,6 +361,7 @@ def break_overlap(hash_):
 def get_cn_from_corres(corres, ref_len):
     cn_detail = []
     for i in range(len(corres)):
+        #print("get_cn_from_corres iteration n : " + str(i))
         # which allele
         cn_detail_ = []
         for j in range(len(corres[i])):
@@ -343,6 +381,36 @@ def get_cn_from_corres(corres, ref_len):
             # in case some key in hash_ overlap with others, need to break them into nonoverlapping ones
             hash_ = break_overlap(hash_)
             cn_detail_.append(get_cn_detail(hash_, ref_len[j]))
+            #print "At allele " + str(i) + ", chromosome " + str(j)
+            #print_hash(hash_)
+        cn_detail.append(cn_detail_)
+    #cn_summary = get_cn_summary(cn_detail)
+    cn_summary = get_cn_summary_(cn_detail)
+    return cn_detail, cn_summary
+
+def get_cn_from_corres_from_npy(corres, ref_len):
+    cn_detail = []
+    for i in range(len(corres)):
+        #print("get_cn_from_corres iteration n : " + str(i))
+        # which allele
+        cn_detail_ = []
+        for j in range(len(corres[i])):
+            # which chromosome 
+            hash_ = {}
+            #cn_detail_ = []
+            for k in range(len(corres[i][j])):
+                ref_se = corres[i][j][k].ref
+                ref_s = ref_se[0]
+                ref_e = ref_se[1]
+                key = str(ref_s) + "." + str(ref_e)
+                #key = float(key)
+                if key in list(hash_.keys()):
+                    hash_[key]= hash_[key] + 1
+                else:
+                    hash_[key] = 1
+            # in case some key in hash_ overlap with others, need to break them into nonoverlapping ones
+            hash_ = break_overlap(hash_)
+            cn_detail_.append(get_cn_detail(hash_, ref_len[i][j]))
             #print "At allele " + str(i) + ", chromosome " + str(j)
             #print_hash(hash_)
         cn_detail.append(cn_detail_)
@@ -596,6 +664,7 @@ def get_cn_detail(hash_, ref_len_):
                 ret_dict[seg] = prev_cn
             seg = ".".join([str(prev_e), str(s)])
             ret_dict[seg] = 0
+
             if cn != 1:
                 rem_s = s
                 rem_e = e
@@ -736,7 +805,7 @@ def get_correspond_pos(p1, p2, if_del, new_corres, amp_num):
                     i_start = i + 1
                     break
                 else:
-                    # now there are two correspondences involved, thus the deletion is broken into two or more (depending on how many correspondences it involves) on the reference
+                    # now there are two correspondences involved, thus the amplification is broken into two or more (depending on how many correspondences it involves) on the reference
                     # for this correspondence, there is only one correspondence left
                     # r1 ----| p1_ref 
                     # g1 --- | p1 
@@ -844,11 +913,27 @@ def print_chr_len(chrlen_array):
     print(chrlen_array)
     return ""
 
+
+def save_status_npy(save_prefix, leaf_chrlen, chr_name_array, leaf_index = None, corres=None):
+    """
+    print("Save: ")
+    print(ref_array)
+    print(chr_name_array)
+    print(leaf_chrlen)
+    """
+    np.save(save_prefix + ".leaf_chrlen.npy", leaf_chrlen)
+    if (leaf_index is not None):
+        np.save(save_prefix + ".leaf_index.npy", leaf_index)
+    if (corres is not None):
+        #print(corres)
+        np.save(save_prefix + ".corres_array.npy", corres)
+    np.save(save_prefix + ".chr_name_array.npy", chr_name_array)
+
 # root_mult is the multiplier of the mean CNV on root branch than those on the leaves
 # whole_amp: if there's whole chromosome amplification
 # whole_amp_rate: rate of an allele on a chromosome chosen to be amplified. 
 # whole_amp_num: the mean of the number of copies added
-def gen_tree(n, Beta, Alpha, Delta, Output, cn_num, del_rate, min_cn_size, exp_theta, amp_p, template_ref, outfile, fa_prefix, snv_rate, root_mult, whole_amp, whole_amp_rate, whole_amp_num, amp_num_geo_par):
+def gen_tree(n, Beta, Alpha, Delta, Output, cn_num, del_rate, min_cn_size, exp_theta, amp_p, template_ref, outfile, fa_prefix, snv_rate, root_mult, whole_amp, whole_amp_rate, whole_amp_num, amp_num_geo_par, template_is_fa, leaf_num_save, npy=None):
     #n = 4
     #Beta = 0.5
     #Alpha = 0.5
@@ -929,27 +1014,52 @@ def gen_tree(n, Beta, Alpha, Delta, Output, cn_num, del_rate, min_cn_size, exp_t
     
     root=MyNode("0: [0,1]")
     root.tuple=[0,1]
-    ref_array, chr_name_array, chr_sz = init_ref(template_ref)
-    chr_sz1 = []
-    # data structure for corresponding coordinates for calculating the actual CNV on reference
-    # copy so that the two arrays of allele length are independent
-    corres2 = []
-    for i in chr_sz:
-        chr_sz1.append(i)
-        corres = corres_coord(0, i, 0, i)
-        corres2.append([corres])
-        # each corres contains two alleles, each alleles contains all chromosomes, each chromosome contains a list of corres_coord data struture, which has the four tuple of ref1, ref2, gen1, gen2
-    root.chrlen=[chr_sz1, chr_sz1]
-    root.corres = [corres2, corres2]
-    #print chr_sz
-    root.id = -1
+    fake_corres = None
+    ## VODKA
+    if template_is_fa:       
+        ref_array, chr_name_array, chr_sz = init_ref(template_ref)
+        chr_sz1 = []
+        corres2 = []
+        # data structure for corresponding coordinates for calculating the actual CNV on reference
+        # copy so that the two arrays of allele length are independent
+        for i in chr_sz:
+            chr_sz1.append(i)
+            corres = corres_coord(0, i, 0, i)
+            #print(corres)
+            corres2.append([corres])
+            # each corres contains two alleles, each alleles contains all chromosomes, each chromosome contains a list of 
+            # corres_coord data struture, which has the four tuple of ref1, ref2, gen1, gen2 containing the correspondance 
+            #between the each segment in the cell genotype to the position of that segment into the reference genome
+        root.chrlen=[chr_sz1, chr_sz1]
+        #corres of tree root:
+        #   for both alleles, for all chromosomes, the genotype is identical to the reference genome
+        root.corres = [corres2, corres2]
+        ##print(type(root.corres))
+        root.id = -1
+    else:
+        ref_array, chr_name_array, chr_sz, chr_size1, chr_size2, corres_array = init_ref_from_npy(npy, template_ref)
+        root.chrlen=[chr_size1, chr_size2]
+        root.corres = corres_array
+        #fake_corres = [corres2, corres2]
+        #root.corres = [corres2, corres3]
+        
+        root.id = -1
     
+    #save_status_npy(fa_prefix+"_begin", chr_sz, chr_name_array, ref_array)
+
+    """
+    corres_dict = MyEncoder().encode(root.corres)
+    print(corres_dict)
+    with open(fa_prefix+"_begin.json", "w") as fbegin:
+        dump(corres_dict, fbegin)
+    """
     Tree = []
     Tree.append(MyNode("0: [0,1]"))
     Tree[0].tuple=[0,1]
     Tree[0].id = 0
     CN_LIST_ID = 0
     # whole chromosome amplification
+    #if template_is_fa:
     if whole_amp == 1:
         Tree[0].cn, Tree[0].chrlen, Tree[0].corres = add_whole_amp(root.chrlen, whole_amp_rate, whole_amp_num, root.corres, amp_num_geo_par)
     # assume most of the CN happens on the root branch
@@ -958,7 +1068,24 @@ def gen_tree(n, Beta, Alpha, Delta, Output, cn_num, del_rate, min_cn_size, exp_t
             Tree[0].cn.append(x)
     else:
         Tree[0].cn, Tree[0].chrlen, Tree[0].corres = add_CN(root.chrlen, (cn_num * root_mult), del_rate, min_cn_size, exp_theta, amp_p, root.corres, CN_LIST_ID)
+   
     Tree[0].cn_detail, Tree[0].cn_summary = get_cn_from_corres(Tree[0].corres, chr_sz)
+    
+    # else:
+    #     # VODKA let's try to use its logic givin its a fake_corres == to the restore from fasta and then plugging back in the saved one.
+    #     # will this break add_whole_amp/add_CN lgic?
+    #     if whole_amp == 1:
+    #         Tree[0].cn, Tree[0].chrlen, Tree[0].corres = add_whole_amp(root.chrlen, whole_amp_rate, whole_amp_num, fake_corres, amp_num_geo_par)
+    #     # assume most of the CN happens on the root branch
+    #         cn_array2, Tree[0].chrlen, Tree[0].corres = add_CN(Tree[0].chrlen, (cn_num * root_mult), del_rate, min_cn_size, exp_theta, amp_p, fake_corres, CN_LIST_ID)
+    #         for x in cn_array2:
+    #             Tree[0].cn.append(x)
+    #     else:
+    #         Tree[0].cn, Tree[0].chrlen, Tree[0].corres = add_CN(root.chrlen, (cn_num * root_mult), del_rate, min_cn_size, exp_theta, amp_p, fake_corres, CN_LIST_ID)
+    #     Tree[0].corres = root.corres
+    #     #Tree[0].cn_detail, Tree[0].cn_summary = get_cn_from_corres(Tree[0].corres, chr_sz)
+    #     Tree[0].cn_detail, Tree[0].cn_summary = get_cn_from_corres(fake_corres, chr_sz) # VODKA this need to be duplicated for both alleles
+        
     #print "Node 0:"
     #print Tree[0].chrlen
     Tree[0].parent=root
@@ -977,10 +1104,12 @@ def gen_tree(n, Beta, Alpha, Delta, Output, cn_num, del_rate, min_cn_size, exp_t
     # add copy number
     Tree[1].cn, Tree[1].chrlen, Tree[1].corres = add_CN(Tree[0].chrlen, cn_num, del_rate, min_cn_size, exp_theta, amp_p, Tree[0].corres, CN_LIST_ID)
     Tree[1].cn_detail, Tree[1].cn_summary = get_cn_from_corres(Tree[1].corres, chr_sz)
+    
     #print "Node 1:"
     #print Tree[1].chrlen
     Tree[2].cn, Tree[2].chrlen, Tree[2].corres = add_CN(Tree[0].chrlen, cn_num, del_rate, min_cn_size, exp_theta, amp_p, Tree[0].corres, CN_LIST_ID)
     Tree[2].cn_detail, Tree[2].cn_summary = get_cn_from_corres(Tree[2].corres, chr_sz)
+  
     #print "Node 2:"
     #print Tree[2].chrlen
     
@@ -1135,4 +1264,21 @@ def gen_tree(n, Beta, Alpha, Delta, Output, cn_num, del_rate, min_cn_size, exp_t
     #    write_ref(Tree[i].ref, chr_name_array, fa_f_prefix)
     
     f.close()
+    # save a random leaf (0 right now) VODKA
+    #random_leaf = 0
+    #random_leaf_index = leaf_index[random_leaf]
+    """
+    corres_dict = MyEncoder().encode(Tree[random_leaf_index].corres)
+    print(corres_dict)
+    with open(fa_prefix + "_end.json", "w") as f:
+        dump(corres_dict, f)
+    """
+    #save_status_npy(fa_prefix+"_end", leaf_chrlen[random_leaf], chr_name_array, make_ref(random_leaf_index, Tree, ref_array), random_leaf_index, Tree[random_leaf_index].corres) # is it needed, keep it to track.
+    
+    if leaf_num_save > 0:
+        random_leaves = np.random.randint(0, n, size=leaf_num_save)
+        for i in np.arange(leaf_num_save):
+            random_leaf_index = leaf_index[random_leaves[i]]
+            save_status_npy(fa_prefix+"_cell"+str(random_leaf_index), leaf_chrlen[random_leaves[i]], chr_name_array, random_leaf_index, Tree[random_leaf_index].corres) # is it needed, keep it to track.
     return leaf_chrlen, leaf_index, chr_name_array, Tree
+

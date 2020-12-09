@@ -26,7 +26,7 @@ def get_summary(tree):
                     chr_ = "chrX"
                 if chr_ == "chr24":
                     chr_ = "chrY"
-                print("\t".join([chr_, str(pos_s), str(pos_e), str(cn), str(ID)])) 
+                print("\t".join([chr_, str(pos_s), str(pos_e), str(cn), str(ID)]))
 
 # in case the tree does not have the cn summary 
 def make_summary_func(tree, ref):

@@ -561,7 +561,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('-i', '--input', required=False, type=str, default='stdin', help="Input Tree File")
     parser.add_argument('-o', '--output', required=False, type=str, default='stdout', help="Output File")
-    #parser.add_argument('-t', '--threshold', required=True, type=float, help="Length Threshold")
+    parser.add_argument('-t', '--threshold', required=False, type=float, help="Length Threshold")
     parser.add_argument('-s', '--support', required=False, type=float, default=float('-inf'), help="Branch Support Threshold")
     parser.add_argument('-m', '--method', required=False, type=str, default='max_clade', help="Clustering Method (options: %s)" % ', '.join(sorted(METHODS.keys())))
     parser.add_argument('-tf', '--threshold_free', required=False, type=str, default=None, help="Threshold-Free Approach (options: %s)" % ', '.join(sorted(THRESHOLDFREE.keys())))
@@ -593,7 +593,8 @@ if __name__ == "__main__":
 
     # run algorithm
     for t,tree in enumerate(trees):
-        threshold = tree.height()
+        #threshold = tree.height()
+        threshold = 0.01
         if args.threshold_free is None:
             clusters = METHODS[args.method.lower()](tree,threshold,args.support)
         else:

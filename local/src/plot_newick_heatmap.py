@@ -2,6 +2,8 @@ import sys, os
 import argparse
 import pandas as pd
 from ete3 import Tree, ProfileFace
+from pyvirtualdisplay import Display
+
 
 def remove_prefix(text, prefix):
     if text.startswith(prefix):
@@ -33,6 +35,10 @@ def main():
     for c in data.columns:
         names.append(int(remove_prefix(c, "cell")))
     data.columns = names
+
+    display = Display(visible=False, size=(1024, 768), color_depth=24)
+    display.start()
+
     plot_tree(t, data, args.out_path)
 
 if __name__ == "__main__":
