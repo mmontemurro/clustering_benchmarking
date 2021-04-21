@@ -22,6 +22,7 @@ from CN import CN
 from Gen_Ref_Fa import gen_ref, init_ref, write_ref, read_ref, init_ref_from_npy, make_ref
 from json import JSONEncoder
 from json import dump
+import pickle
 
 
 nuc_array = ['A', 'B', 'C', 'D']
@@ -125,6 +126,8 @@ class MyNode(Node):
         self.cn_summary={}
         self.cn_detail=[]
         self.parentID = -1
+        self.subTree=-1
+        self.subTree_l2=-1
     def getTuple(self):
         return self.tuple
     def setDead(self):
@@ -207,6 +210,7 @@ def wg2chr(chrlen, p):
 # given reference fasta, chrlen, snp_rate, branch length, add snvs by specifying its chr, position and change
 def add_SNV(chrlen, ref, snv_rate, length):
     ret_ref = [row[:] for row in ref]
+    print(ret_ref)
     for ale in range(len(chrlen)):
         # decide how many snvs to be added according to snv_rate and length
         mean = snv_rate * length
@@ -929,11 +933,18 @@ def save_status_npy(save_prefix, leaf_chrlen, chr_name_array, leaf_index = None,
         np.save(save_prefix + ".corres_array.npy", corres)
     np.save(save_prefix + ".chr_name_array.npy", chr_name_array)
 
+def save_cell_pickle(save_prefix, cell_node):
+    cell_name = "cell_" + str(cell_node.id) 
+    with open(save_prefix+"/"+cell_name +".pickle", "wb") as f:
+        pickle.dump(cell_node, f)
+    return save_prefix+"/"+cell_name +".pickle"
+
 # root_mult is the multiplier of the mean CNV on root branch than those on the leaves
 # whole_amp: if there's whole chromosome amplification
 # whole_amp_rate: rate of an allele on a chromosome chosen to be amplified. 
 # whole_amp_num: the mean of the number of copies added
-def gen_tree(n, Beta, Alpha, Delta, Output, cn_num, del_rate, min_cn_size, exp_theta, amp_p, template_ref, outfile, fa_prefix, snv_rate, root_mult, whole_amp, whole_amp_rate, whole_amp_num, amp_num_geo_par, template_is_fa, leaf_num_save, npy=None):
+def gen_tree(n, Beta, Alpha, Delta, Output, cn_num, del_rate, min_cn_size, exp_theta, amp_p, template_ref, outfile, fa_prefix, snv_rate, root_mult, 
+        whole_amp, whole_amp_rate, whole_amp_num, amp_num_geo_par, template_is_fa, subtrees=0, subtrees_l2=0,  metastasis=None, pickle_f=None):
     #n = 4
     #Beta = 0.5
     #Alpha = 0.5
@@ -972,9 +983,12 @@ def gen_tree(n, Beta, Alpha, Delta, Output, cn_num, del_rate, min_cn_size, exp_t
     
     f = open(outfile, "w")
     
-    
-    
-    
+    met = 0
+    if metastasis is not None:
+        if metastasis == 1: #early
+            met = round(1/4 * n)
+        elif metastasis == 2: #late
+            met = round(3/4*n)
     
     #n= int(n)
     #Alpha = float(Alpha)
@@ -993,6 +1007,7 @@ def gen_tree(n, Beta, Alpha, Delta, Output, cn_num, del_rate, min_cn_size, exp_t
     Vi = np.random.uniform(0.0,1.0,n-1)
     Di = np.random.uniform(0.0,1.0,n-1)
     Bi = np.random.beta(float(Alpha+1),float(Beta+1),n-1)
+    Mi = np.random.uniform(0.0,1.0,n-1) #probability of seeding a metastasis
     
     #Normalizing the branch lengths
     summation = 0
@@ -1002,7 +1017,7 @@ def gen_tree(n, Beta, Alpha, Delta, Output, cn_num, del_rate, min_cn_size, exp_t
     for T in range(0,len(ti)):
         ti[T]=float(ti[T])/float(summation)
     
-    #print ti
+    
     
     
     #Contructing the phylogeny
@@ -1014,7 +1029,8 @@ def gen_tree(n, Beta, Alpha, Delta, Output, cn_num, del_rate, min_cn_size, exp_t
     
     root=MyNode("0: [0,1]")
     root.tuple=[0,1]
-    fake_corres = None
+    if template_is_fa:
+        pickle_f = ""
     ## VODKA
     if template_is_fa:       
         ref_array, chr_name_array, chr_sz = init_ref(template_ref)
@@ -1036,113 +1052,118 @@ def gen_tree(n, Beta, Alpha, Delta, Output, cn_num, del_rate, min_cn_size, exp_t
         root.corres = [corres2, corres2]
         ##print(type(root.corres))
         root.id = -1
-    else:
+        """
+        else:
         ref_array, chr_name_array, chr_sz, chr_size1, chr_size2, corres_array = init_ref_from_npy(npy, template_ref)
         root.chrlen=[chr_size1, chr_size2]
         root.corres = corres_array
         #fake_corres = [corres2, corres2]
         #root.corres = [corres2, corres3]
-        
         root.id = -1
-    
-    #save_status_npy(fa_prefix+"_begin", chr_sz, chr_name_array, ref_array)
-
-    """
-    corres_dict = MyEncoder().encode(root.corres)
-    print(corres_dict)
-    with open(fa_prefix+"_begin.json", "w") as fbegin:
-        dump(corres_dict, fbegin)
-    """
-    Tree = []
-    Tree.append(MyNode("0: [0,1]"))
-    Tree[0].tuple=[0,1]
-    Tree[0].id = 0
-    CN_LIST_ID = 0
-    # whole chromosome amplification
-    #if template_is_fa:
-    if whole_amp == 1:
-        Tree[0].cn, Tree[0].chrlen, Tree[0].corres = add_whole_amp(root.chrlen, whole_amp_rate, whole_amp_num, root.corres, amp_num_geo_par)
-    # assume most of the CN happens on the root branch
-        cn_array2, Tree[0].chrlen, Tree[0].corres = add_CN(Tree[0].chrlen, (cn_num * root_mult), del_rate, min_cn_size, exp_theta, amp_p, Tree[0].corres, CN_LIST_ID)
-        for x in cn_array2:
-            Tree[0].cn.append(x)
-    else:
-        Tree[0].cn, Tree[0].chrlen, Tree[0].corres = add_CN(root.chrlen, (cn_num * root_mult), del_rate, min_cn_size, exp_theta, amp_p, root.corres, CN_LIST_ID)
+        """ 
    
-    Tree[0].cn_detail, Tree[0].cn_summary = get_cn_from_corres(Tree[0].corres, chr_sz)
+        Tree = []
+        Tree.append(MyNode("0: [0,1]"))
+        Tree[0].tuple=[0,1]
+        Tree[0].id = 0
+        CN_LIST_ID = 0
+        # whole chromosome amplification
+        #if template_is_fa:
+        if whole_amp == 1:
+            Tree[0].cn, Tree[0].chrlen, Tree[0].corres = add_whole_amp(root.chrlen, whole_amp_rate, whole_amp_num, root.corres, amp_num_geo_par)
+            # assume most of the CN happens on the root branch
+            cn_array2, Tree[0].chrlen, Tree[0].corres = add_CN(Tree[0].chrlen, (cn_num * root_mult), del_rate, min_cn_size, exp_theta, amp_p, Tree[0].corres, CN_LIST_ID)
+            for x in cn_array2:
+                Tree[0].cn.append(x)
+        else:
+            Tree[0].cn, Tree[0].chrlen, Tree[0].corres = add_CN(root.chrlen, (cn_num * root_mult), del_rate, min_cn_size, exp_theta, amp_p, root.corres, CN_LIST_ID)
+   
+        Tree[0].cn_detail, Tree[0].cn_summary = get_cn_from_corres(Tree[0].corres, chr_sz)
+
+        Tree[0].parent=root
+        Tree[0].edge_length = np.random.exponential(1,1)
+
+        Tree[0].ref, Tree[0].snvs = add_SNV(Tree[0].chrlen, Tree[0].ref, snv_rate, Tree[0].edge_length)
+    #else:
+    #    ref_array, chr_name_array, chr_sz, root_node = init_ref_from_pickle(pickle_f, template_ref)
+    #    Tree = []
+    #    Tree.append(root_node)
+    #    CN_LIST_ID = 0
     
-    # else:
-    #     # VODKA let's try to use its logic givin its a fake_corres == to the restore from fasta and then plugging back in the saved one.
-    #     # will this break add_whole_amp/add_CN lgic?
-    #     if whole_amp == 1:
-    #         Tree[0].cn, Tree[0].chrlen, Tree[0].corres = add_whole_amp(root.chrlen, whole_amp_rate, whole_amp_num, fake_corres, amp_num_geo_par)
-    #     # assume most of the CN happens on the root branch
-    #         cn_array2, Tree[0].chrlen, Tree[0].corres = add_CN(Tree[0].chrlen, (cn_num * root_mult), del_rate, min_cn_size, exp_theta, amp_p, fake_corres, CN_LIST_ID)
-    #         for x in cn_array2:
-    #             Tree[0].cn.append(x)
-    #     else:
-    #         Tree[0].cn, Tree[0].chrlen, Tree[0].corres = add_CN(root.chrlen, (cn_num * root_mult), del_rate, min_cn_size, exp_theta, amp_p, fake_corres, CN_LIST_ID)
-    #     Tree[0].corres = root.corres
-    #     #Tree[0].cn_detail, Tree[0].cn_summary = get_cn_from_corres(Tree[0].corres, chr_sz)
-    #     Tree[0].cn_detail, Tree[0].cn_summary = get_cn_from_corres(fake_corres, chr_sz) # VODKA this need to be duplicated for both alleles
-        
-    #print "Node 0:"
-    #print Tree[0].chrlen
-    Tree[0].parent=root
-    Tree[0].edge_length = np.random.exponential(1,1)
-    
-    # update the reference on the node
-    #Tree[0].ref = gen_ref(ref_array, Tree[0].cn)
-    #tmp_ref = gen_ref(ref_array, Tree[0].cn)
-    # memory issue, write it to a file
-    #fa_f_prefix = fa_prefix + str(0) + "_"
-    #write_ref(tmp_ref, chr_name_array, fa_f_prefix)
-    #Tree[0].ref, Tree[0].snvs = add_SNV(Tree[0].chrlen, Tree[0].ref, snv_rate, Tree[0].edge_length)
-    
-    Tree.append(MyNode(str(1)+":[0,"+"{0:.2f}".format(Bi[0])+"]"+","+"{0:.4f}".format(ti[0])))
-    Tree.append(MyNode(str(2)+":["+"{0:.2f}".format(Bi[0])+",1]"+","+"{0:.4f}".format(ti[1])))
+    """
+    with open("node0.pickle", "wb") as f:
+        pickle.dump(Tree[0], f)
+    """
+
+    id1 = 1 if template_is_fa else Tree[0].id+1
+    id2 = id1 + 1
+
+    Tree.append(MyNode(str(id1)+":[0,"+"{0:.2f}".format(Bi[0])+"]"+","+"{0:.4f}".format(ti[0])))
+    Tree.append(MyNode(str(id2)+":["+"{0:.2f}".format(Bi[0])+",1]"+","+"{0:.4f}".format(ti[1])))
     # add copy number
     Tree[1].cn, Tree[1].chrlen, Tree[1].corres = add_CN(Tree[0].chrlen, cn_num, del_rate, min_cn_size, exp_theta, amp_p, Tree[0].corres, CN_LIST_ID)
     Tree[1].cn_detail, Tree[1].cn_summary = get_cn_from_corres(Tree[1].corres, chr_sz)
     
-    #print "Node 1:"
-    #print Tree[1].chrlen
     Tree[2].cn, Tree[2].chrlen, Tree[2].corres = add_CN(Tree[0].chrlen, cn_num, del_rate, min_cn_size, exp_theta, amp_p, Tree[0].corres, CN_LIST_ID)
     Tree[2].cn_detail, Tree[2].cn_summary = get_cn_from_corres(Tree[2].corres, chr_sz)
   
     #print "Node 2:"
     #print Tree[2].chrlen
     
-    # update the reference
-    #Tree[1].ref = gen_ref(Tree[0].ref, Tree[1].cn)
-    #Tree[2].ref = gen_ref(Tree[0].ref, Tree[2].cn)
-    # memory issue. at one time at most 2.5 references, each is 6gb (2 alleles). 
-    #parent_ref = read_ref(fa_prefix + str(0) + "_")
-    #tmp_ref = gen_ref(parent_ref, Tree[1].cn)
-    #fa_f_prefix = fa_prefix + str(1) + "_"
-    #write_ref(tmp_ref, chr_name_array, fa_f_prefix)
-    #tmp_ref = gen_ref(parent_ref, Tree[2].cn)
-    #fa_f_prefix = fa_prefix + str(2) + "_"
-    #write_ref(tmp_ref, chr_name_array, fa_f_prefix)
-    
     Tree[1].parent=Tree[0]
     Tree[2].parent=Tree[0]
     # set parent ID
     Tree[1].parentID = 0
     Tree[2].parentID = 0
-    Tree[1].id = 1
-    Tree[2].id = 2
+    Tree[1].id = id1
+    Tree[2].id = id2
     Tree[1].tuple=[0,Bi[0]]
     Tree[2].tuple=[Bi[0],1]
     Tree[1].edge_length = ti[0]
     Tree[2].edge_length = ti[1]
-    #Tree[1].ref, Tree[1].snvs = add_SNV(Tree[1].chrlen, Tree[1].ref, snv_rate, Tree[1].edge_length)
-    #Tree[2].ref, Tree[2].snvs = add_SNV(Tree[2].chrlen, Tree[2].ref, snv_rate, Tree[2].edge_length)
+    Tree[1].ref, Tree[1].snvs = add_SNV(Tree[1].chrlen, Tree[1].ref, snv_rate, Tree[1].edge_length)
+    Tree[2].ref, Tree[2].snvs = add_SNV(Tree[2].chrlen, Tree[2].ref, snv_rate, Tree[2].edge_length)
+
+   
+    subTrees = {}
+    
+    subTrees_l2 = {}
+
+    if subtrees == 2:
+        Tree[1].subTree = 0
+        Tree[2].subTree = 1
+        subTrees[0] = [Tree[1]]
+        subTrees[1] = [Tree[2]]
+    
+    # to track multiple trees at a time
+    if subtrees_l2 == 2:
+        Tree[1].subTree_l2 = 0
+        Tree[2].subTree_l2 = 1
     
     node_number=2
+    new_id = id2
     j=1
-    
+    if subtrees > 2:
+        roots_found = False
+    if subtrees_l2 > 2:
+        roots_found_l2 = False
     while j<n-1:
+        n_leaves = j + 1 
+        if subtrees > 2 and n_leaves == subtrees and roots_found == False:
+            subtree_id = 0
+            for tr in Tree:
+                if tr.is_leaf and (not tr.is_dead):
+                    tr.subTree = subtree_id
+                    subTrees[subtree_id] = [tr]
+                    subtree_id += 1
+            roots_found = True
+        if subtrees_l2 > 2 and n_leaves == subtrees_l2 and roots_found_l2 == False:
+            subtree_l2_id = 0
+            for tr in Tree:
+                if tr.is_leaf and (not tr.is_dead):
+                    tr.subTree_l2 = subtree_l2_id
+                    subtree_l2_id += 1
+            roots_found_l2 = True
         if Vi[j] < Delta :
             for tr in Tree:
                 if tr.is_leaf and is_in(Di[j], tr.getTuple()):
@@ -1150,6 +1171,15 @@ def gen_tree(n, Beta, Alpha, Delta, Output, cn_num, del_rate, min_cn_size, exp_t
                         tr.name = tr.name+"*"
                     tr.setDead()
                     break
+        elif met > 0 and n_leaves >= met:
+            for tr in Tree:
+                if tr.is_leaf and is_in(Mi[j], tr.getTuple()) and (not tr.is_dead) :
+                    if (not tr.is_dead):
+                        tr.name = tr.name+"*"
+                    tr.setDead()
+                    pickle_f = save_cell_pickle(Output, tr)
+                    break
+            met = 0
         else:
             for tree in Tree:
                 if tree.is_leaf and is_in(Ui[j], tree.getTuple()) and (not tree.is_dead) :
@@ -1160,10 +1190,11 @@ def gen_tree(n, Beta, Alpha, Delta, Output, cn_num, del_rate, min_cn_size, exp_t
                     #print "the node from " + str(node_number + 1) + " to " + str(node_number+2) + "s' parent id: " + str(tree.getID())
                     a,b = tree.getTuple()
                     node_number+=2
+                    new_id+=2
                     #Two new children are born here
                     middle = float(Bi[j])*float((float(b)-float(a)))+float(a)
-                    Tree.append(MyNode(str(node_number-1)+":["+"{0:.4f}".format(a)+","+"{0:.4f}".format(middle)+"]"+","+"{0:.4f}".format(ti[node_number-1]), parent=tree))
-                    Tree.append(MyNode(str(node_number)+":["+"{0:.4f}".format(middle)+","+"{0:.4f}".format(b)+"]"+","+"{0:.4f}".format(ti[node_number]), parent=tree))
+                    Tree.append(MyNode(str(new_id-1)+":["+"{0:.4f}".format(a)+","+"{0:.4f}".format(middle)+"]"+","+"{0:.4f}".format(ti[node_number-1]), parent=tree))
+                    Tree.append(MyNode(str(new_id)+":["+"{0:.4f}".format(middle)+","+"{0:.4f}".format(b)+"]"+","+"{0:.4f}".format(ti[node_number]), parent=tree))
     
                     #The new intervals are assigned here
                     Tree[node_number-1].tuple=[a,middle]
@@ -1186,49 +1217,37 @@ def gen_tree(n, Beta, Alpha, Delta, Output, cn_num, del_rate, min_cn_size, exp_t
                     this_chrlen = tree.chrlen[:]
                     #print this_chrlen
                     #print node_number, tree.getID()
-    
-                    # add reference
-                    # memory issue
-                    #Tree[node_number-1].ref = gen_ref(tree.ref, Tree[node_number-1].cn) 
-                    #Tree[node_number].ref = gen_ref(tree.ref, Tree[node_number].cn) 
-                    # now do not calculate the ref anyway, as it takes lots of hard disk space. Just get the tree with cn, then at the leaf, trace back all the cns up to root, and apply it to each leaf. This will solve both the memory and hard disk issue. 
-                    #tmp_ref = gen_ref(parent_ref, Tree[node_number-1].cn)
-                    #fa_f_prefix = fa_prefix + str(node_number-1) + "_"
-                    #write_ref(tmp_ref, chr_name_array, fa_f_prefix)
-                    #tmp_ref = gen_ref(parent_ref, Tree[node_number].cn)
-                    #fa_f_prefix = fa_prefix + str(node_number) + "_"
-                    #write_ref(tmp_ref, chr_name_array, fa_f_prefix)
 
                     # set parent id
                     Tree[node_number].parentID = this_id
                     Tree[node_number-1].parentID = this_id
                     # add snvs
-                    #Tree[node_number-1].ref, Tree[node_number-1].snvs = add_SNV(Tree[node_number-1].chrlen, Tree[node_number-1].ref, snv_rate, Tree[node_number-1].edge_length)
-                    #Tree[node_number].ref, Tree[node_number].snvs = add_SNV(Tree[node_number].chrlen, Tree[node_number].ref, snv_rate, Tree[node_number].edge_length)
+                    Tree[node_number-1].ref, Tree[node_number-1].snvs = add_SNV(Tree[node_number-1].chrlen, Tree[node_number-1].ref, snv_rate, Tree[node_number-1].edge_length)
+                    Tree[node_number].ref, Tree[node_number].snvs = add_SNV(Tree[node_number].chrlen, Tree[node_number].ref, snv_rate, Tree[node_number].edge_length)
     
                     # set id
-                    Tree[node_number-1].id = node_number - 1
-                    Tree[node_number].id = node_number
-    
+                    Tree[node_number-1].id = new_id - 1
+                    Tree[node_number].id = new_id
+                    Tree[node_number-1].subTree = tree.subTree
+                    Tree[node_number].subTree = tree.subTree
+                    if tree.subTree != -1: 
+                        subTrees[tree.subTree].append(Tree[node_number])
+
+                    Tree[node_number-1].subTree_l2 = tree.subTree_l2
+                    Tree[node_number].subTree_l2 = tree.subTree_l2
                     break
     
-        j+=1
-    
-    #Changing names of the leaves
-    #leaf_name=0
-    #for nd in Tree:
-    #    if nd.is_leaf:
-    #        nd.name = leaf_name
-    #        leaf_name+=1
-    
-    #for pre, fill, node in RenderTree(Tree[0]):
-    #    print("%s%s" % (pre, node.name))
+            j+=1
     
     # record the chromosome length for each leaf on the tree
     leaf_chrlen = []
     # record which are leaves
     leaf_index = []
-    f.write("Before the tree, chromosomomal length is " + str(root.chrlen) + "\n")
+    # if subtrees record which are their leaves
+    leaf_subtrees = []
+    leaf_subtrees_l2 = []
+    if template_is_fa:
+        f.write("Before the tree, chromosomomal length is " + str(root.chrlen) + "\n")
     for i in range(len(Tree)):
         f.write("node %d: \n" % i)
         f.write("    parent = %d\n" % Tree[i].parent.getID())
@@ -1236,6 +1255,8 @@ def gen_tree(n, Beta, Alpha, Delta, Output, cn_num, del_rate, min_cn_size, exp_t
     for i in range(len(Tree)):
         if Tree[i].is_leaf:
             leaf_index.append(i)
+            leaf_subtrees.append(Tree[i].subTree)
+            leaf_subtrees_l2.append(Tree[i].subTree_l2)
             leaf_chrlen.append(Tree[i].chrlen)
         cn = Tree[i].cn
         f.write("node %d from %d: total CN # = %d\n" % (i, Tree[i].parent.getID(), len(cn)))
@@ -1264,21 +1285,10 @@ def gen_tree(n, Beta, Alpha, Delta, Output, cn_num, del_rate, min_cn_size, exp_t
     #    write_ref(Tree[i].ref, chr_name_array, fa_f_prefix)
     
     f.close()
-    # save a random leaf (0 right now) VODKA
-    #random_leaf = 0
-    #random_leaf_index = leaf_index[random_leaf]
-    """
-    corres_dict = MyEncoder().encode(Tree[random_leaf_index].corres)
-    print(corres_dict)
-    with open(fa_prefix + "_end.json", "w") as f:
-        dump(corres_dict, f)
-    """
-    #save_status_npy(fa_prefix+"_end", leaf_chrlen[random_leaf], chr_name_array, make_ref(random_leaf_index, Tree, ref_array), random_leaf_index, Tree[random_leaf_index].corres) # is it needed, keep it to track.
-    
-    if leaf_num_save > 0:
-        random_leaves = np.random.randint(0, n, size=leaf_num_save)
-        for i in np.arange(leaf_num_save):
-            random_leaf_index = leaf_index[random_leaves[i]]
-            save_status_npy(fa_prefix+"_cell"+str(random_leaf_index), leaf_chrlen[random_leaves[i]], chr_name_array, random_leaf_index, Tree[random_leaf_index].corres) # is it needed, keep it to track.
-    return leaf_chrlen, leaf_index, chr_name_array, Tree
+    print(subTrees)
+    return leaf_chrlen, leaf_index, leaf_subtrees, subTrees, chr_name_array, Tree, pickle_f
 
+
+
+
+   

@@ -45,6 +45,34 @@ def getlen_ref(template):
     file.close()
     return chr_name, len_chr
 
+def init_ref_from_pickle(pickle_f, template):
+    import pickle
+    with open(pickle_f,'rb') as f:
+         root_node = pickle.load(f)
+    ref = []
+    len_chr = root_node.chrlen
+    chr_name = []
+    len_chr = []
+    file = open(template,"r")
+    line = "tmp"
+    # initialize string
+    str_ = ""
+    line = file.readline().rstrip('\n')
+    while(line != ""):
+        if line[0] == '>':
+            chr_name.append(line[1:])
+            if str_ != "":
+                ref.append(str_)
+            str_ = ""
+        else:
+            str_ = str_ + line
+        line = file.readline().rstrip('\n')
+    ref.append(str_)
+    file.close()
+    ref_diploid = [ref, ref]
+    return ref_diploid, chr_name, len_chr, root_node
+    
+
 
 def init_ref_from_npy(prefix, template):
     # read a template from npy objects representing a leaf obtained from a previous run

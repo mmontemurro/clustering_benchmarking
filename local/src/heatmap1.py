@@ -1,4 +1,4 @@
-import sys
+import sys, os
 import argparse
 import pandas as pd
 import numpy as np
@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 
 
-def heatmap(cnvs, boundaries, method, metric, outdir):
+def heatmap(cnvs, boundaries, method, metric, outprefix):
     divnorm = colors.DivergingNorm(vmin=0, vcenter=2, vmax=12)  
     chr_limits = boundaries.index[boundaries['END'].isin(boundaries.groupby('CHR', sort=False)['END'].max().values)].tolist()
     chr_boundaries = np.append(0, chr_limits)
@@ -42,7 +42,7 @@ def heatmap(cnvs, boundaries, method, metric, outdir):
     ax.set_ylabel("cells", fontsize=18, fontweight='bold')
     plt.gcf().set_size_inches(37, 21)   
     plt.gcf().suptitle("CNV heatmap", fontsize=24, fontweight='bold')
-    plt.savefig(outdir+"/heatmap.png")
+    plt.savefig(outprefix+"_heatmap.png")
     plt.clf()
     
 
@@ -52,18 +52,20 @@ def main():
 
     parser.add_argument("input", metavar="SegCopy", action="store", type=str, help="CNV file")
     parser.add_argument("outdir", metavar="out_dir_path", action="store", type=str, help="Output directory path")
+    parser.add_argument("-o", "--outprefix", metavar="out_prefix", action="store", type=str, help="Output prefix")
 
     args = parser.parse_args()
 
     segcopy = args.input
     outdir = args.outdir
+    outprefix = args.outprefix if args.outprefix else ""
 
     df = pd.read_csv(segcopy, sep="\t")
 
     cnvs = df.drop(['CHR', 'START', 'END'], axis=1).transpose()
     boundaries = df[['CHR', 'START', 'END']].copy()
 
-    heatmap(cnvs, boundaries, 'complete', 'cityblock', outdir)
+    heatmap(cnvs, boundaries, 'complete', 'cityblock', os.path.join(outdir, outprefix))
 
 if __name__ == "__main__":
     sys.exit(main())

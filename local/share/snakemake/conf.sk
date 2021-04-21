@@ -48,6 +48,8 @@ TREE_CLUSTER=BIN_DIR+"/TreeCluster"
 EXT_VALIDATION=BIN_DIR+"/cl_external_validation"
 PLT_GT_CLUSTERS=BIN_DIR+"/plot_newick_clusters"
 MERGE_ALL=BIN_DIR+"/merge_all"
+SPLIT_SUBTREES=SRC_DIR+"/split_subtree_leaves.py"
+HEATMAP1=SRC_DIR+"/heatmap1.py"
 
 
 TOOLS = {
@@ -88,6 +90,15 @@ EXP = {
 
 }
 
+EXP_MET = {
+    "Met_Early" : {
+        "s" : 1
+    },
+    "Met_late" : {
+        "s" : 2
+    }
+}
+
 SMALL_GENOME=SHR_DIR+"/data/small_genome.fa"
 
 EXP_PHYLICS = {
@@ -103,17 +114,11 @@ EXP_PHYLICS = {
 
 }
 
-SAMPLES=["Sample1", "Sample2", "Sample3", "Sample4", "Sample5",
-        "Sample6", "Sample7", "Sample8", "Sample9", "Sample10",
-        "Sample11", "Sample12", "Sample13", "Sample14", "Sample15",
-        "Sample16", "Sample17", "Sample18", "Sample19", "Sample20",
-        "Sample21", "Sample22", "Sample23", "Sample24", "Sample25",
-        "Sample26", "Sample27", "Sample28", "Sample29", "Sample30",
-        "Sample31", "Sample32", "Sample33", "Sample34", "Sample35",
-        "Sample36", "Sample37", "Sample38", "Sample39", "Sample40",
-        "Sample41", "Sample42", "Sample43", "Sample44", "Sample45",
-        "Sample46", "Sample47", "Sample48", "Sample49", "Sample50",
-        ] 
+SAMPLES = 50
+SAMPLES= [ "Sample" + str(x) for x in range(1, SAMPLES+1) ]
+
+SUBTREES = 5
+SUBSAMPLES= ["subsample" + str(x) for x in range(SUBTREES)]
     
 SAMPLES_PHYLICS = ["Sample1", "Sample2"]
 

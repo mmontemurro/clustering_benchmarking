@@ -172,7 +172,7 @@ parser.add_argument('-w', '--window-size', default=200000)
 parser.add_argument('-u', '--acceptance-rate', default=0.5)
 parser.add_argument('-k', '--skip-first-step', default=0)
 parser.add_argument('-R', '--snv_rate', default=0)
-parser.add_argument('-X', '--multi-root', default=4)
+parser.add_argument('-X', '--multi-root', default=4) #TODO disabilitate for metastasis
 parser.add_argument('-W', '--whole-amp', default=0)
 parser.add_argument('-C', '--whole-amp-rate', default=0.2)
 parser.add_argument('-E', '--whole-amp-num', default=1)
@@ -180,9 +180,8 @@ parser.add_argument('-J', '--amp-num-geo-par', default=1)
 parser.add_argument('-Y', '--leaf-index-range', default="-1")
 parser.add_argument('-I', '--leaf-ID-range', default="-1")
 ####
-parser.add_argument('-N', '--npy')
-parser.add_argument('-s', '--leaf_num_save', type=int, default=0)
-
+parser.add_argument('-s', '--metastasis', type=int, default=None) #if defined, 1 means early seeding and 2 means late seeding
+parser.add_argument('-st', '--subtrees', type=int, default=1) #if subtrees > 1, the subtrees rooted in the first subtree cells are marked as belonging to a spatial segregated clone
 
 args = parser.parse_args()
 NUM_OF_PROCESSES = int(args.processors)
@@ -240,6 +239,7 @@ if skip == 0:
 
 leaf_chrlen = []
 leaf_index = []
+leaf_subtree = []
 chr_name_array = []
 
 def check_Ns(file):
@@ -259,19 +259,35 @@ def check_Ns(file):
 # Now all CNs are in tree, not generating fa or remember it in the tree nodes.
 if skip == 0:
     # call with last arg as True if template is fasta, otherwise we load from fa_prefix the three npy
-    if args.npy is None:
-        [leaf_chrlen, leaf_index, chr_name_array, tree] = gen_tree(n, Beta, Alpha, Delta, dir, cn_num, del_rate, min_cn_size, exp_theta, amp_p, template_ref, outfile, fa_prefix, snv_rate, root_mult, whole_amp, whole_amp_rate, whole_amp_num, amp_num_geo_par, True, args.leaf_num_save)
-    else:
-        ## VODKA
-        print("Recovering from npy " + args.npy)
-        [leaf_chrlen, leaf_index, chr_name_array, tree] = gen_tree(n, Beta, Alpha, Delta, dir, cn_num, del_rate, min_cn_size, exp_theta, amp_p, template_ref, outfile, fa_prefix, snv_rate, root_mult, whole_amp, whole_amp_rate, whole_amp_num, amp_num_geo_par, False, args.leaf_num_save, args.npy)
+    print("Generating single cell tree")
+    [leaf_chrlen, leaf_index, leaf_subtree, subTrees, chr_name_array, tree, pickle_f] = gen_tree(n, Beta, Alpha, Delta, dir, cn_num, del_rate, min_cn_size, exp_theta, amp_p, template_ref, outfile, fa_prefix, snv_rate, root_mult, whole_amp, whole_amp_rate, whole_amp_num, amp_num_geo_par, True, subtrees=args.subtrees, subtrees_l2=0, metastasis=args.metastasis)
     numpy.save(save_prefix + ".leaf_chrlen.npy", leaf_chrlen)
     numpy.save(save_prefix + ".leaf_index.npy", leaf_index)
+    numpy.save(save_prefix + ".leaf_subtree.npy", leaf_subtree)
     numpy.save(save_prefix + ".chr_name_array.npy", chr_name_array)
+    #save subtrees npys
+    for key, value in subTrees.items():
+        numpy.save(save_prefix + ".subtree." + str(key) +".npy", value)
+
     # save the tree for parallele job submission afterwards
     numpy.save(save_prefix + ".tree.npy", tree)
-    #numpy.save(save_prefix + ".ref.npy", ref)
     print("Done with generating the tree. Save to npy. ")
+    if args.metastasis is not None:
+        print("Seeding metastasis")
+        dir = dir + "/met"
+        subprocess.check_call("mkdir " + dir, shell=True)
+        fa_prefix = dir + "/" + args.fa_prefix     
+        
+        [leaf_chrlen, leaf_index, _,_, chr_name_array, tree, _] = gen_tree(n, Beta, Alpha, Delta, dir, cn_num, del_rate, min_cn_size, exp_theta, amp_p, template_ref, outfile, fa_prefix, snv_rate, root_mult, whole_amp, whole_amp_rate, whole_amp_num, amp_num_geo_par, False, pickle_f=pickle_f)
+        
+        save_prefix = dir + "/" + "from_first_step" 
+        numpy.save(save_prefix + ".leaf_chrlen.npy", leaf_chrlen)
+        numpy.save(save_prefix + ".leaf_index.npy", leaf_index)
+        numpy.save(save_prefix + ".chr_name_array.npy", chr_name_array)
+        numpy.save(save_prefix + ".tree.npy", tree)
+        print("Done with generating the metastasis tree. Save to npy. ")
+
+    
 #print leaf_index
 
 # Step 2. Consider even coverage, use metropolis hasting to sample read count in each bin based on a given point on Lorenz curve. 
