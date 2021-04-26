@@ -5,20 +5,14 @@ import argparse
 
 parser = argparse.ArgumentParser(description = "From intersectBed to ginkgo beds")
 
-parser.add_argument("beds_dir", metavar="input/dir/path", action="store", help="Input directory path", type=str)
-parser.add_argument("out_dir", metavar="output/dir/path", action="store", help="Output directory path", type=str)
+parser.add_argument("-b", "--beds", required=True, metavar="[file1.bed, file2.bed...]", action="store", help="Input bed files", nargs="+")
+parser.add_argument("-o", "--output", required=True, metavar="output/dir/path/SegCopy", action="store", help="Output directory file", type=str)
 
 args = parser.parse_args()
 
-beds = args.beds_dir
-outdir = args.out_dir
+beds = args.beds
 segcopy = pd.DataFrame(columns=["CHR", "START", "END"])
-for filename in os.listdir(beds):
-    if filename.endswith(".bed"):
-         # print(os.path.join(directory, filename))
-        bed = os.path.join(beds, filename)
-        cellid = os.path.splitext(filename)[0]
-        
+for bed in beds:
         df = pd.read_csv(bed, sep="\t", header=None)
 
         if len(segcopy) == 0: #first cell
@@ -28,4 +22,4 @@ for filename in os.listdir(beds):
         
         segcopy[cellid] = df[3]
 
-segcopy.to_csv(os.path.join(outdir, "SegCopy"), sep="\t", index=False)
+segcopy.to_csv(args.output, sep="\t", index=False)
