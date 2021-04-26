@@ -1,1 +1,0 @@
-The data and figs folder hold the structure on organizing the data to generate the violin plots in figs folder. The violin plots included here are those for different ploidies and different levels of fluctuation of the read count. 

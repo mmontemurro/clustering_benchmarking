@@ -51,6 +51,9 @@ MERGE_ALL=BIN_DIR+"/merge_all"
 SPLIT_SUBTREES=SRC_DIR+"/split_subtree_leaves.py"
 HEATMAP1=SRC_DIR+"/heatmap1.py"
 
+SPLIT_SUBSAMPLES_L1=BIN_DIR+"/split_subsamples_l1"
+SPLIT_SUBSAMPLES_L2=BIN_DIR+"/split_subsamples_l2"
+
 
 TOOLS = {
     'affinity': BIN_DIR+'/affinity.py',
@@ -122,3 +125,5 @@ SUBSAMPLES= ["subsample" + str(x) for x in range(SUBTREES)]
     
 SAMPLES_PHYLICS = ["Sample1", "Sample2"]
 
+NCELLS_PER_SAMPLE = 50
+SUBSAMPLES_PER_CLADE = 1
