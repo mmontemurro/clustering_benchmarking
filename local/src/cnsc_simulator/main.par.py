@@ -1,5 +1,5 @@
 #!/usr/bin/python$
-
+import pickle
 import argparse
 import subprocess
 import os
@@ -182,6 +182,7 @@ parser.add_argument('-I', '--leaf-ID-range', default="-1")
 ####
 parser.add_argument('-s', '--metastasis', type=int, default=None) #if defined, 1 means early seeding and 2 means late seeding
 parser.add_argument('-st', '--subtrees', type=int, default=1) #if subtrees > 1, the subtrees rooted in the first subtree cells are marked as belonging to a spatial segregated clone
+parser.add_argument('-st2', '--subtrees_l2', type=int, default=1) #if subtrees > 1, the subtrees rooted in the first subtree cells are marked as belonging to a spatial segregated clone
 
 args = parser.parse_args()
 NUM_OF_PROCESSES = int(args.processors)
@@ -260,18 +261,28 @@ def check_Ns(file):
 if skip == 0:
     # call with last arg as True if template is fasta, otherwise we load from fa_prefix the three npy
     print("Generating single cell tree")
-    [leaf_chrlen, leaf_index, leaf_subtree, subTrees, chr_name_array, tree, pickle_f] = gen_tree(n, Beta, Alpha, Delta, dir, cn_num, del_rate, min_cn_size, exp_theta, amp_p, template_ref, outfile, fa_prefix, snv_rate, root_mult, whole_amp, whole_amp_rate, whole_amp_num, amp_num_geo_par, True, subtrees=args.subtrees, subtrees_l2=0, metastasis=args.metastasis)
+    [leaf_chrlen, leaf_index, subTrees_l1, subTrees_l2, chr_name_array, tree, pickle_f] = gen_tree(n, Beta, Alpha, Delta, dir, cn_num, del_rate, min_cn_size, exp_theta, amp_p, template_ref, outfile, fa_prefix, snv_rate, root_mult, whole_amp, whole_amp_rate, whole_amp_num, amp_num_geo_par, True, subtrees=args.subtrees, subtrees_l2=args.subtrees_l2, metastasis=args.metastasis)
     numpy.save(save_prefix + ".leaf_chrlen.npy", leaf_chrlen)
     numpy.save(save_prefix + ".leaf_index.npy", leaf_index)
-    numpy.save(save_prefix + ".leaf_subtree.npy", leaf_subtree)
     numpy.save(save_prefix + ".chr_name_array.npy", chr_name_array)
-    #save subtrees npys
-    for key, value in subTrees.items():
-        numpy.save(save_prefix + ".subtree." + str(key) +".npy", value)
 
     # save the tree for parallele job submission afterwards
     numpy.save(save_prefix + ".tree.npy", tree)
     print("Done with generating the tree. Save to npy. ")
+
+    #save subtrees pickles
+    if args.subtrees > 1:
+        f = open(save_prefix + ".subtrees.pickle", "wb")
+        pickle.dump(subTrees_l1, f, protocol=pickle.HIGHEST_PROTOCOL)
+        f.close()
+        print("Done with generating the L1 subtrees. Save to pickle. ")
+    
+    if args.subtrees_l2 > 1:
+        f = open(save_prefix + ".subtrees_l2.pickle", "wb")
+        pickle.dump(subTrees_l2, f, protocol=pickle.HIGHEST_PROTOCOL)
+        f.close()
+        print("Done with generating the L2 subtrees. Save to pickle. ")
+
     if args.metastasis is not None:
         print("Seeding metastasis")
         dir = dir + "/met"

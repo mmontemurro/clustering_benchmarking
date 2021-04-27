@@ -19,7 +19,7 @@ import sys
 import re
 from anytree.dotexport import RenderTreeGraph
 from CN import CN
-from Gen_Ref_Fa import gen_ref, init_ref, write_ref, read_ref, init_ref_from_npy, make_ref
+from Gen_Ref_Fa import gen_ref, init_ref, write_ref, read_ref, init_ref_from_npy, make_ref, init_ref_from_pickle
 from json import JSONEncoder
 from json import dump
 import pickle
@@ -1139,6 +1139,8 @@ def gen_tree(n, Beta, Alpha, Delta, Output, cn_num, del_rate, min_cn_size, exp_t
     if subtrees_l2 == 2:
         Tree[1].subTree_l2 = 0
         Tree[2].subTree_l2 = 1
+        subTrees[0] = {"tree":[Tree[1]], "subtree_l1" : Tree[1].subTree}
+        subTrees[1] = {"tree":[Tree[2]], "subtree_l1" : Tree[2].subTree}
     
     node_number=2
     new_id = id2
@@ -1148,32 +1150,34 @@ def gen_tree(n, Beta, Alpha, Delta, Output, cn_num, del_rate, min_cn_size, exp_t
     if subtrees_l2 > 2:
         roots_found_l2 = False
     while j<n-1:
-        n_leaves = j + 1 
+        #n_leaves = j + 1
+        n_leaves = len(Tree[0].leaves) 
         if subtrees > 2 and n_leaves == subtrees and roots_found == False:
             subtree_id = 0
-            for tr in Tree:
-                if tr.is_leaf and (not tr.is_dead):
+            for tr in Tree[0].leaves:
+                if tr.is_dead == False:
                     tr.subTree = subtree_id
                     subTrees[subtree_id] = [tr]
                     subtree_id += 1
             roots_found = True
         if subtrees_l2 > 2 and n_leaves == subtrees_l2 and roots_found_l2 == False:
             subtree_l2_id = 0
-            for tr in Tree:
-                if tr.is_leaf and (not tr.is_dead):
+            for tr in Tree[0].leaves:
+                if tr.is_dead == False:
                     tr.subTree_l2 = subtree_l2_id
+                    subTrees_l2[subtree_l2_id] =  {"tree":[tr], "subtree_l1" : tr.subTree}
                     subtree_l2_id += 1
             roots_found_l2 = True
         if Vi[j] < Delta :
-            for tr in Tree:
-                if tr.is_leaf and is_in(Di[j], tr.getTuple()):
+            for tr in Tree[0].leaves:
+                if is_in(Di[j], tr.getTuple()):
                     if (not tr.is_dead):
                         tr.name = tr.name+"*"
                     tr.setDead()
                     break
         elif met > 0 and n_leaves >= met:
-            for tr in Tree:
-                if tr.is_leaf and is_in(Mi[j], tr.getTuple()) and (not tr.is_dead) :
+            for tr in Tree[0].leaves:
+                if is_in(Mi[j], tr.getTuple()) and (not tr.is_dead) :
                     if (not tr.is_dead):
                         tr.name = tr.name+"*"
                     tr.setDead()
@@ -1181,8 +1185,8 @@ def gen_tree(n, Beta, Alpha, Delta, Output, cn_num, del_rate, min_cn_size, exp_t
                     break
             met = 0
         else:
-            for tree in Tree:
-                if tree.is_leaf and is_in(Ui[j], tree.getTuple()) and (not tree.is_dead) :
+            for tree in Tree[0].leaves:
+                if is_in(Ui[j], tree.getTuple()) and (not tree.is_dead) :
                     # get the reference of this node, as it is a parent of the following two
                     this_id = tree.getID()
                     #parent_ref = read_ref(fa_prefix + str(this_id) + "_")
@@ -1230,13 +1234,16 @@ def gen_tree(n, Beta, Alpha, Delta, Output, cn_num, del_rate, min_cn_size, exp_t
                     Tree[node_number].id = new_id
                     Tree[node_number-1].subTree = tree.subTree
                     Tree[node_number].subTree = tree.subTree
-                    if tree.subTree != -1: 
-                        subTrees[tree.subTree].append(Tree[node_number])
-
                     Tree[node_number-1].subTree_l2 = tree.subTree_l2
                     Tree[node_number].subTree_l2 = tree.subTree_l2
+                    if tree.subTree != -1: 
+                        subTrees[tree.subTree].append(Tree[node_number])
+                    if tree.subTree_l2 != -1: 
+                        subTrees_l2[tree.subTree_l2]["tree"].append(Tree[node_number])
+                        subTrees_l2[tree.subTree_l2]["subtree_l1"] = Tree[node_number].subTree
+
                     break
-    
+            print("Nleaves generated = {}".format(len(Tree[0].leaves)))
             j+=1
     
     # record the chromosome length for each leaf on the tree
@@ -1244,8 +1251,6 @@ def gen_tree(n, Beta, Alpha, Delta, Output, cn_num, del_rate, min_cn_size, exp_t
     # record which are leaves
     leaf_index = []
     # if subtrees record which are their leaves
-    leaf_subtrees = []
-    leaf_subtrees_l2 = []
     if template_is_fa:
         f.write("Before the tree, chromosomomal length is " + str(root.chrlen) + "\n")
     for i in range(len(Tree)):
@@ -1255,8 +1260,6 @@ def gen_tree(n, Beta, Alpha, Delta, Output, cn_num, del_rate, min_cn_size, exp_t
     for i in range(len(Tree)):
         if Tree[i].is_leaf:
             leaf_index.append(i)
-            leaf_subtrees.append(Tree[i].subTree)
-            leaf_subtrees_l2.append(Tree[i].subTree_l2)
             leaf_chrlen.append(Tree[i].chrlen)
         cn = Tree[i].cn
         f.write("node %d from %d: total CN # = %d\n" % (i, Tree[i].parent.getID(), len(cn)))
@@ -1285,8 +1288,7 @@ def gen_tree(n, Beta, Alpha, Delta, Output, cn_num, del_rate, min_cn_size, exp_t
     #    write_ref(Tree[i].ref, chr_name_array, fa_f_prefix)
     
     f.close()
-    print(subTrees)
-    return leaf_chrlen, leaf_index, leaf_subtrees, subTrees, chr_name_array, Tree, pickle_f
+    return leaf_chrlen, leaf_index, subTrees, subTrees_l2, chr_name_array, Tree, pickle_f
 
 
 
