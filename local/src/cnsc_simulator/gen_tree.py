@@ -148,6 +148,7 @@ def get_range(chr_len, min_cn_size, exp_theta, CN_LIST_ID):
         # not try any more if cannot find a good one, just use the end
         trials = 0
         max_n = 10
+        #exp_theta -> expected value = 1/lambda
         cn_size = np.random.exponential(exp_theta) + min_cn_size
         p1 = np.random.uniform(skip, chr_len - skip)
         # make sure p2 not out of boundary

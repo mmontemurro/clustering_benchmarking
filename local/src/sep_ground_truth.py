@@ -15,7 +15,7 @@ leaves_npy = args.leaves_npy
 # get all the leaf ids out, each leaf id contains all the lines corresponding to it
 h={}
 
-leaves = np.load(leaves_npy)
+leaves = np.load(leaves_npy, allow_pickle=True)
 
 with open(input_f, "r") as f:
     for l in f:

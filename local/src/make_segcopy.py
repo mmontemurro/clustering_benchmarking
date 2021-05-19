@@ -14,7 +14,7 @@ beds = args.beds
 segcopy = pd.DataFrame(columns=["CHR", "START", "END"])
 for bed in beds:
         df = pd.read_csv(bed, sep="\t", header=None)
-
+        cellid = os.path.splitext(os.path.basename(bed))[0]
         if len(segcopy) == 0: #first cell
             segcopy["CHR"] = df[0]
             segcopy["START"] = df[1]

@@ -6,13 +6,11 @@ import argparse
 
 parser = argparse.ArgumentParser(description = "From intersectBed to ginkgo beds")
 
-parser.add_argument("-i", "-input", required=True, metavar="input/dir/path/cell.bed", action="store", help="Input file path", type=str)
+parser.add_argument("-i", "--input", required=True, metavar="input/dir/path/cell.bed", action="store", help="Input file path", type=str)
 parser.add_argument("-o", "--output", required=True, metavar="input/dir/path/cell.bed", action="store", help="Output file path", type=str)
 
 args = parser.parse_args()
 
-beds = args.beds_dir
-outdir = args.out_dir
 
 wm = lambda x: round(np.average(x, weights=df.loc[x.index, "len"]))
 
